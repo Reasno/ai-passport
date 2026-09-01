@@ -1,0 +1,45 @@
+menu "Kids Points 固件"
+
+config WIFI_SSID
+    string "Wi-Fi SSID"
+    default "YOUR_WIFI_SSID_HERE"
+
+config WIFI_PASSWORD
+    string "Wi-Fi password"
+    default "YOUR_WIFI_PASSWORD_HERE"
+
+config MQTT_BROKER_HOST
+    string "MQTT broker host"
+    default "192.168.31.111"
+
+config MQTT_BROKER_PORT
+    int "MQTT broker port"
+    range 1 65535
+    default 1883
+
+choice KIDS_ACTOR
+    prompt "绑定孩子"
+    default KIDS_ACTOR_BROTHER
+config KIDS_ACTOR_BROTHER
+    bool "brother（哥哥）"
+config KIDS_ACTOR_SISTER
+    bool "sister（妹妹）"
+endchoice
+
+config ACTOR_CHILD_ID
+    string
+    default "brother" if KIDS_ACTOR_BROTHER
+    default "sister" if KIDS_ACTOR_SISTER
+
+config KIDS_USE_OFFICIAL_AVATAR
+    bool "Use built-in official avatar artwork"
+    default y
+    help
+        Show the checked-in RGB565A8 brother/sister artwork directly from flash.
+        Disable only to use the small vector fallback avatar.
+
+config KIDS_THEME_SISTER
+    bool
+    default y if KIDS_ACTOR_SISTER
+
+endmenu

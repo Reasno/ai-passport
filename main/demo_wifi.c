@@ -2,6 +2,7 @@
 #include "demo.h"
 #include "demo_radio.h"
 #include "ui_pixel.h"
+#include "wifi_service.h"
 
 #include "esp_event.h"
 #include "esp_log.h"
@@ -34,6 +35,7 @@ static volatile wifi_demo_state_t s_state;
 static volatile esp_err_t s_error;
 static bool s_wifi_initialized;
 static bool s_wifi_started;
+static bool s_owns_wifi;
 static bool s_handler_registered;
 
 static void scan_done(void *arg, esp_event_base_t base, int32_t id, void *data)
@@ -61,8 +63,20 @@ static esp_err_t start_scan(void)
 
 static esp_err_t wifi_start(void)
 {
+    esp_err_t err;
     s_state = WIFI_DEMO_STARTING;
-    esp_err_t err = demo_radio_nvs_prepare();
+
+    if (wifi_service_is_started()) {
+        err = esp_event_handler_instance_register(
+            WIFI_EVENT, WIFI_EVENT_SCAN_DONE, scan_done, NULL, &s_scan_handler);
+        if (err != ESP_OK) goto fail;
+        s_handler_registered = true;
+        s_wifi_started = true;
+        s_owns_wifi = false;
+        return start_scan();
+    }
+
+    err = demo_radio_nvs_prepare();
     if (err != ESP_OK) goto fail;
     err = demo_radio_network_prepare();
     if (err != ESP_OK) goto fail;
@@ -90,6 +104,7 @@ static esp_err_t wifi_start(void)
     err = esp_wifi_start();
     if (err != ESP_OK) goto fail;
     s_wifi_started = true;
+    s_owns_wifi = true;
 
     return start_scan();
 
@@ -157,7 +172,7 @@ static void wifi_stop(void)
 {
     if (s_wifi_started) {
         esp_wifi_scan_stop();
-        esp_wifi_stop();
+        if (s_owns_wifi) esp_wifi_stop();
         s_wifi_started = false;
     }
     if (s_handler_registered) {
@@ -165,14 +180,15 @@ static void wifi_stop(void)
                                               s_scan_handler);
         s_handler_registered = false;
     }
-    if (s_wifi_initialized) {
+    if (s_wifi_initialized && s_owns_wifi) {
         esp_wifi_deinit();
         s_wifi_initialized = false;
     }
-    if (s_sta_netif) {
+    if (s_sta_netif && s_owns_wifi) {
         esp_netif_destroy_default_wifi(s_sta_netif);
         s_sta_netif = NULL;
     }
+    s_owns_wifi = false;
     s_state = WIFI_DEMO_OFF;
 }
 
