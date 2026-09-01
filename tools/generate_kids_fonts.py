@@ -1,38 +1,162 @@
 #!/usr/bin/env python3
-import pathlib
-import subprocess
-import sys
+"""Generate and audit the three Kids Points LVGL fonts.
 
-if len(sys.argv) != 2:
-    raise SystemExit("usage: generate_kids_fonts.py /path/to/NotoSansSC-Regular.ttf")
-font = pathlib.Path(sys.argv[1]).resolve()
-if not font.is_file():
-    raise SystemExit(f"font not found: {font}")
+The audit decodes lv_font_conv's generated cmaps instead of trusting the
+command-line comment.  Run without a TTF to audit checked-in fonts only:
+    tools/generate_kids_fonts.py --audit-only
+"""
+import argparse
+import pathlib
+import re
+import subprocess
+
 root = pathlib.Path(__file__).resolve().parents[1]
 out = root / "main" / "fonts"
-out.mkdir(parents=True, exist_ok=True)
-chars = []
-for high in range(0xB0, 0xD8):
-    for low in range(0xA1, 0xFF):
-        try:
-            chars.append(bytes((high, low)).decode("gb2312"))
-        except UnicodeDecodeError:
-            pass
-if len(chars) != 3755:
-    raise SystemExit(f"GB2312 level-1 count mismatch: {len(chars)}")
-ascii_punct = "".join(chr(i) for i in range(0x20, 0x7F)) + "，。！？：；、（）《》“”‘’—…￥·✓○↑↓★"
-fixed = ascii_punct + "今日积分共享余额任务已完成列表兑换奖品立即刷新在线离线同步中选择确认长按主页滚动打卡还没有需要爸爸妈妈当前连接家里的再试电视一次大转盘抽奖价格暂未开放不可换正在处理请稍候幸运麦当劳元开始谢谢恭喜抽中自动入账到账户请求超时格式错误保留旧数据成功失败继续努力哦谷沁园萱哥哥妹妹进度回"
-compact = "今日任务兑换抽奖在线离线积分余额进度哥哥妹妹请稍候选择确认长按回主页↑↓✓. "
+FONT_FILES = {
+    14: out / "lv_font_noto_sc_14.c",
+    18: out / "lv_font_noto_sc_18.c",
+    24: out / "lv_font_noto_sc_24.c",
+}
+SOURCE_FILES = [
+    *sorted((root / "main" / "ui").glob("*.c")),
+    root / "main" / "interaction" / "game_service.c",
+    root / "main" / "mqtt_service.c",
+]
+ASCII_PUNCT = "".join(chr(i) for i in range(0x20, 0x7F)) + "，。！？：；、（）《》“”‘’￥"
+FORBIDDEN_UI_SYMBOLS = "↑↓✓○★·…—　"
+SMALL_TEXT = """
+积分余额今日进度今日任务兑换奖品互动游戏请稍候选择确认长按主页
+上下中键上键下键设备滚动打卡执行切换返回兑换页抽奖进行中请等待
+已配对未配对重配找伙伴响铃和近距离信号请先完成配对
+纯娱乐不增减积分可用内存等待扫描中让伙伴离线不可用
+正在说话松开结束对讲本地娱乐对战今日价格当前余额
+哥哥妹妹小朋友分秒完成调试预览未发送
+""" + "+：%/.MQTTWi-FidBmKBPassport"
+TITLE_TEXT = """
+积分余额当前余额确认完成确认兑换恭喜伙伴就在附近等待近距离信号
+伙伴正在找你分
+""" + "！？：0123456789"
 
-def run(size: int, symbols: str, output: pathlib.Path):
-    subprocess.run([
-        "npx", "--yes", "lv_font_conv@1.5.3", "--font", str(font),
-        "--size", str(size), "--bpp", "4", "--format", "lvgl",
-        "--no-compress", "--no-prefilter", "--lv-include", "lvgl.h", "--symbols", symbols,
-        "--output", str(output)
-    ], check=True)
 
-run(14, "".join(dict.fromkeys(compact)), out / "lv_font_noto_sc_14.c")
-run(18, ascii_punct + "".join(chars), out / "lv_font_noto_sc_18.c")
-run(24, "".join(dict.fromkeys(fixed)), out / "lv_font_noto_sc_24.c")
-print("generated:", out / "lv_font_noto_sc_14.c", out / "lv_font_noto_sc_18.c", out / "lv_font_noto_sc_24.c")
+def gb2312_level1():
+    chars = []
+    for high in range(0xB0, 0xD8):
+        for low in range(0xA1, 0xFF):
+            try:
+                chars.append(bytes((high, low)).decode("gb2312"))
+            except UnicodeDecodeError:
+                pass
+    if len(chars) != 3755:
+        raise SystemExit(f"GB2312 level-1 count mismatch: {len(chars)}")
+    return "".join(chars)
+
+
+def unique(text):
+    return "".join(dict.fromkeys(text.replace("\n", "")))
+
+
+def c_string_literals(text):
+    # UI text is kept in ordinary UTF-8 C literals; concatenated and formatted
+    # strings are intentionally included so toast/status glyphs are audited too.
+    return re.findall(r'"((?:\\.|[^"\\])*)"', text)
+
+
+def static_source_chars():
+    chars = []
+    for path in SOURCE_FILES:
+        text = path.read_text(encoding="utf-8")
+        if "LV_FONT_MONTSERRAT" in text:
+            raise SystemExit(f"Chinese UI must not use Montserrat: {path}")
+        forbidden = sorted(set(text) & set(FORBIDDEN_UI_SYMBOLS))
+        if forbidden:
+            raise SystemExit(f"unverified Unicode UI symbol(s) in {path}: {''.join(forbidden)}")
+        for literal in c_string_literals(text):
+            try:
+                decoded = bytes(literal, "utf-8").decode("unicode_escape").encode("latin1").decode("utf-8")
+            except (UnicodeDecodeError, UnicodeEncodeError):
+                decoded = literal
+            chars.extend(c for c in decoded if ord(c) >= 0x80)
+    # Kconfig defaults are user-visible on Home even before local overrides.
+    chars.extend("小朋友哥哥妹妹")
+    return unique("".join(chars))
+
+
+def parse_generated_cmap(path):
+    text = path.read_text(encoding="utf-8")
+    arrays = {}
+    for name, body in re.findall(
+        r"static const uint16_t (unicode_list_\d+)\[\] = \{(.*?)\};", text, re.S
+    ):
+        arrays[name] = [int(value, 16) for value in re.findall(r"0x([0-9a-fA-F]+)", body)]
+    glyphs = set()
+    block_match = re.search(r"static const lv_font_fmt_txt_cmap_t cmaps\[\].*?=\s*\{(.*?)\n\};", text, re.S)
+    if not block_match:
+        raise SystemExit(f"cannot find cmap table: {path}")
+    for block in re.findall(r"\{(.*?)\}", block_match.group(1), re.S):
+        start_match = re.search(r"\.range_start\s*=\s*(\d+)", block)
+        length_match = re.search(r"\.range_length\s*=\s*(\d+)", block)
+        if not start_match or not length_match:
+            continue
+        start, length = int(start_match.group(1)), int(length_match.group(1))
+        if "CMAP_FORMAT0" in block:
+            glyphs.update(range(start, start + length))
+        else:
+            list_match = re.search(r"\.unicode_list\s*=\s*(unicode_list_\d+)", block)
+            if not list_match or list_match.group(1) not in arrays:
+                raise SystemExit(f"cannot decode sparse cmap in {path}")
+            glyphs.update(start + offset for offset in arrays[list_match.group(1)])
+    return glyphs
+
+
+def required_sets():
+    source = static_source_chars()
+    return {
+        14: unique(ASCII_PUNCT + SMALL_TEXT + source),
+        18: unique(ASCII_PUNCT + gb2312_level1() + source),
+        24: unique(ASCII_PUNCT + TITLE_TEXT),
+    }
+
+
+def audit(required):
+    for size, path in FONT_FILES.items():
+        glyphs = parse_generated_cmap(path)
+        missing = sorted(set(map(ord, required[size])) - glyphs)
+        if missing:
+            preview = "".join(chr(cp) for cp in missing[:80])
+            raise SystemExit(f"{size}px missing {len(missing)} glyph(s): {preview}")
+        print(f"{size}px: glyphs={len(glyphs)} required={len(set(required[size]))} coverage=100%")
+    dynamic = set(gb2312_level1()) | set(ASCII_PUNCT)
+    print(f"dynamic 18px contract: ASCII + GB2312 level-1 ({len(dynamic)} unique glyphs); outside range falls back to '?'")
+
+
+def generate(font, required):
+    out.mkdir(parents=True, exist_ok=True)
+    for size in (14, 18, 24):
+        subprocess.run([
+            "npx", "--yes", "lv_font_conv@1.5.3", "--font", str(font),
+            "--size", str(size), "--bpp", "4", "--format", "lvgl",
+            "--no-compress", "--no-prefilter", "--lv-include", "lvgl.h",
+            "--symbols", required[size], "--output", str(FONT_FILES[size]),
+        ], check=True)
+        generated = FONT_FILES[size].read_text(encoding="utf-8").rstrip() + "\n"
+        FONT_FILES[size].write_text(generated, encoding="utf-8")
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("font", nargs="?", type=pathlib.Path)
+    parser.add_argument("--audit-only", action="store_true")
+    args = parser.parse_args()
+    required = required_sets()
+    if not args.audit_only:
+        if not args.font:
+            parser.error("font path is required unless --audit-only is used")
+        font = args.font.expanduser().resolve()
+        if not font.is_file():
+            raise SystemExit(f"font not found: {font}")
+        generate(font, required)
+    audit(required)
+
+
+if __name__ == "__main__":
+    main()

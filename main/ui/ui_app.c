@@ -1,16 +1,21 @@
 #include "ui_app.h"
 #include "app_events.h"
 #include "app_model.h"
+#include "game_service.h"
 #include "mqtt_service.h"
 #include "nvs_cache.h"
 #include "power_service.h"
+#include "ptt_service.h"
 #include "sound_service.h"
 #include "ui_common.h"
 #include "ui_confirm.h"
+#include "ui_games.h"
 #include "ui_home.h"
 #include "ui_lottery.h"
+#include "lottery_assets.h"
 #include "ui_redeem.h"
 #include "ui_tasks.h"
+#include "ui_text.h"
 #include "bsp_display.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -19,122 +24,279 @@
 #include <stdio.h>
 #include <string.h>
 
-typedef enum { PAGE_HOME, PAGE_TASKS, PAGE_CONFIRM, PAGE_REDEEM, PAGE_LOTTERY } page_t;
+typedef enum { PAGE_HOME, PAGE_TASKS, PAGE_CONFIRM, PAGE_REDEEM, PAGE_LOTTERY, PAGE_GAMES, PAGE_FIND, PAGE_RPS } page_t;
 static const char *TAG = "kp_ui";
 static page_t s_page = PAGE_HOME, s_confirm_return = PAGE_HOME;
-static int s_selected;
-static confirm_kind_t s_confirm_kind;
-static char s_confirm_id[APP_ID_LEN], s_confirm_name[APP_NAME_LEN];
-static int s_confirm_points;
-static char s_message[128];
-static bool s_message_error;
-static int64_t s_message_until;
-static int s_lottery_highlight;
+static int s_selected; static confirm_kind_t s_confirm_kind;
+static char s_confirm_id[APP_ID_LEN], s_confirm_name[APP_NAME_LEN]; static int s_confirm_points;
+static char s_message[128]; static bool s_message_error; static int64_t s_message_until;
+static int s_lottery_rotation; static bool s_lottery_animating; static int64_t s_lottery_reveal_at;
 static bool s_suppress_wake_key;
-/* UI task owns this reusable snapshot; keeping the ~2 KB model off its stack is critical. */
+#if CONFIG_ENABLE_SCREENSHOT
+static bool s_debug_preview;
+#endif
+static bool s_find_waiting, s_find_ringing, s_find_flash, s_ignore_key_until_release, s_ignore_ring_click;
+static int64_t s_find_deadline, s_find_ring_deadline, s_find_next_flash;
+static char s_find_status[64], s_find_sender[64];
+/* Large cross-module snapshots are static to preserve the measured-safe 4 KB UI stack. */
 static app_model_snapshot_t s_ui_model;
+static game_snapshot_t s_game;
 
-static app_model_snapshot_t *model_snapshot(void)
-{
-    app_model_snapshot(&s_ui_model);
-    return &s_ui_model;
-}
-
+static app_model_snapshot_t *model_snapshot(void) { app_model_snapshot(&s_ui_model); return &s_ui_model; }
+static game_snapshot_t *game_snapshot(void) { game_service_snapshot(&s_game); return &s_game; }
 static void set_message(const char *text, bool error)
 {
-    strlcpy(s_message, text ? text : "", sizeof(s_message)); s_message_error = error; s_message_until = esp_timer_get_time() / 1000 + 2200;
+    ui_text_limit_lines(text, s_message, sizeof(s_message), UI_TEXT_STANDARD_MAX_CHARS);
+    s_message_error = error;
+    s_message_until = esp_timer_get_time() / 1000 + 2400;
 }
 static void render(void)
 {
-    app_model_snapshot_t *model = model_snapshot();
+    app_model_snapshot_t *model = model_snapshot(); game_snapshot_t *game = game_snapshot();
+#if CONFIG_ENABLE_SCREENSHOT
+    /* Preview-only snapshots never mutate ESP-NOW, MQTT, pairing, radar or RPS state. */
+    if (s_debug_preview && s_page == PAGE_FIND) {
+        game->paired = true;
+        game->peer_nearby = true;
+        game->rssi = -54;
+        game->distance_bars = 4;
+    } else if (s_debug_preview && s_page == PAGE_RPS) {
+        game->state = GAME_STATE_WAITING_CHOICE;
+        game->seconds_left = 10;
+        strlcpy(game->status, "请选择出拳", sizeof(game->status));
+    }
+#endif
     if (!bsp_lvgl_lock(1000)) return;
     lv_obj_t *screen = NULL;
     if (s_page == PAGE_HOME) screen = ui_home_build(model, s_selected);
     else if (s_page == PAGE_TASKS) screen = ui_tasks_build(model, s_selected);
     else if (s_page == PAGE_REDEEM) screen = ui_redeem_build(model, s_selected);
     else if (s_page == PAGE_CONFIRM) screen = ui_confirm_build(model, s_confirm_kind, s_confirm_name, s_confirm_points, s_selected);
-    else screen = ui_lottery_build(model, s_lottery_highlight);
+    else if (s_page == PAGE_LOTTERY) screen = ui_lottery_build(model, s_lottery_rotation,
+#if CONFIG_ENABLE_SCREENSHOT
+                                                               s_lottery_animating || s_debug_preview
+#else
+                                                               s_lottery_animating
+#endif
+                                                               );
+    else if (s_page == PAGE_GAMES) screen = ui_games_build(model, game, s_selected);
+    else if (s_page == PAGE_FIND) screen = ui_find_build(model, game, s_find_status, s_find_waiting);
+    else screen = ui_rps_build(model, game);
     if (s_message[0] && esp_timer_get_time() / 1000 < s_message_until) ui_common_message(screen, s_message, s_message_error);
-    lv_screen_load_anim(screen, LV_SCR_LOAD_ANIM_NONE, 0, 0, true);
-    bsp_lvgl_unlock();
+    if (s_find_ringing) ui_common_find_overlay(screen, s_find_flash);
+    lv_screen_load_anim(screen, LV_SCR_LOAD_ANIM_NONE, 0, 0, true); bsp_lvgl_unlock();
 }
 static void go(page_t page, int selected)
 {
+#if CONFIG_ENABLE_SCREENSHOT
+    s_debug_preview = false;
+#endif
+    if (s_page == PAGE_FIND && page != PAGE_FIND) {
+        game_service_set_radar(false);
+        ptt_service_set_transmitting(false);
+    }
     s_page = page; s_selected = selected; ESP_LOGI(TAG, "页面=%d 选中=%d", page, selected); render();
 }
 static void key_move(int delta, int count)
 {
     if (count <= 0) return;
-    s_selected = (s_selected + delta + count) % count;
-    sound_service_play(SOUND_TICK);
-    render();
+    s_selected = (s_selected + delta + count) % count; sound_service_play(SOUND_TICK); render();
 }
 static void begin_confirm(confirm_kind_t kind, page_t back, const char *id, const char *name, int points)
 {
-    s_confirm_kind = kind; s_confirm_return = back; strlcpy(s_confirm_id, id, sizeof(s_confirm_id)); strlcpy(s_confirm_name, name, sizeof(s_confirm_name)); s_confirm_points = points; go(PAGE_CONFIRM, 0);
+    s_confirm_kind = kind; s_confirm_return = back; strlcpy(s_confirm_id, id, sizeof(s_confirm_id));
+    ui_text_limit_lines(name, s_confirm_name, sizeof(s_confirm_name), UI_TEXT_STANDARD_MAX_CHARS);
+    s_confirm_points = points; go(PAGE_CONFIRM, 0);
 }
 static void handle_short_key(bsp_btn_t key)
 {
-    app_model_snapshot_t *model = model_snapshot();
-    if (model->pending_type != APP_PENDING_NONE && s_page != PAGE_LOTTERY) return;
+    app_model_snapshot_t *model = model_snapshot(); game_snapshot_t *game = game_snapshot();
+    if (model->pending_type != APP_PENDING_NONE && s_page != PAGE_LOTTERY && s_page != PAGE_GAMES && s_page != PAGE_FIND && s_page != PAGE_RPS) return;
     int delta = key == BSP_BTN_UP ? -1 : 1;
     if (s_page == PAGE_HOME) {
         if (key != BSP_BTN_OK) key_move(delta, 3);
-        else if (s_selected == 0) go(PAGE_TASKS, 0);
-        else if (s_selected == 1) go(PAGE_REDEEM, 0);
-        else { mqtt_service_resubscribe(); set_message(model->mqtt_online ? "正在同步最新数据" : "当前离线，显示缓存数据", !model->mqtt_online); render(); }
+        else if (s_selected == 0) go(PAGE_TASKS, 0); else if (s_selected == 1) go(PAGE_REDEEM, 0); else go(PAGE_GAMES, 0);
     } else if (s_page == PAGE_TASKS) {
         if (key != BSP_BTN_OK) key_move(delta, model->task_count);
-        else if (model->task_count == 0) { set_message("今天还没有任务", false); render(); }
-        else { const app_task_t *t = &model->tasks[s_selected]; if (!model->mqtt_online) set_message("当前离线，请联网后再试", true); else if (t->completed_today) set_message("这个任务已经完成啦", false); else if (!t->self_complete) set_message("这个任务需要爸爸妈妈确认", false); else { begin_confirm(CONFIRM_TASK, PAGE_TASKS, t->id, t->name, t->points); return; } render(); }
+        else if (!model->task_count) { set_message("今天还没有任务", false); render(); }
+        else { const app_task_t *t = &model->tasks[s_selected];
+            if (!model->mqtt_online) set_message("当前离线，请联网再试", true);
+            else if (t->completed_today) set_message("这个任务已经完成啦", false);
+            else if (!t->self_complete) set_message("这个任务不在这里完成", false);
+            else { begin_confirm(CONFIRM_TASK, PAGE_TASKS, t->id, t->name, t->points); return; } render(); }
     } else if (s_page == PAGE_REDEEM) {
         if (key != BSP_BTN_OK) key_move(delta, 2);
-        else { int idx = ui_redeem_model_index(model, s_selected); if (!model->mqtt_online) set_message("当前离线，请连接家里的 Wi-Fi 再试", true); else if (idx < 0 || !model->rewards[idx].enabled) set_message("奖品暂未开放", true); else if (!model->balance_valid || model->balance < model->rewards[idx].price) set_message("积分不够，继续努力哦", true); else { begin_confirm(CONFIRM_REDEEM, PAGE_REDEEM, model->rewards[idx].id, model->rewards[idx].name, model->rewards[idx].price); return; } render(); }
+        else { int idx = ui_redeem_model_index(model, s_selected);
+            if (!model->mqtt_online) set_message("当前离线\n请连接Wi-Fi再试", true);
+            else if (idx < 0 || !model->rewards[idx].enabled) set_message("奖品暂未开放", true);
+            else if (!model->balance_valid || model->balance < model->rewards[idx].price) set_message("积分不够，继续努力哦", true);
+            else { begin_confirm(CONFIRM_REDEEM, PAGE_REDEEM, model->rewards[idx].id, model->rewards[idx].name, model->rewards[idx].price); return; } render(); }
     } else if (s_page == PAGE_CONFIRM) {
         if (key != BSP_BTN_OK) key_move(delta, 2);
         else if (s_selected == 0) go(s_confirm_return, 0);
-        else { bool sent = s_confirm_kind == CONFIRM_TASK ? mqtt_service_publish_complete_task(s_confirm_id) : mqtt_service_publish_redeem(s_confirm_id); if (sent) { set_message("正在处理中，请稍候...", false); sound_service_play(SOUND_TICK); go(s_confirm_return, 0); } else { set_message("无法提交，请检查网络或稍后重试", true); sound_service_play(SOUND_DU); render(); } }
-    } else if (s_page == PAGE_LOTTERY && model->lottery_ready && key == BSP_BTN_OK) go(PAGE_REDEEM, 1);
+        else { bool sent = s_confirm_kind == CONFIRM_TASK ? mqtt_service_publish_complete_task(s_confirm_id) : mqtt_service_publish_redeem(s_confirm_id);
+            if (sent) { set_message("正在处理中，请稍候...", false); sound_service_play(SOUND_TICK); go(s_confirm_return, 0); }
+            else { set_message("无法提交\n请检查网络后重试", true); sound_service_play(SOUND_DU); render(); } }
+    } else if (s_page == PAGE_LOTTERY && model->lottery_ready && !s_lottery_animating && key == BSP_BTN_OK) go(PAGE_REDEEM, 1);
+    else if (s_page == PAGE_GAMES) {
+        if (key != BSP_BTN_OK) key_move(delta, 2);
+        else if (!game->paired) { set_message("请长按中键先配对", false); render(); }
+        else if (s_selected == 0) { if (!game_service_heap_allows_radar()) { set_message("内存不足\n找伙伴暂不可用", true); render(); } else { game_service_set_radar(true); s_find_status[0] = 0; s_find_waiting = false; go(PAGE_FIND, 0); } }
+        else { if (!game_service_heap_allows_rps()) { set_message("内存不足，对战不可用", true); render(); } else { game_service_invite_rps(); go(PAGE_RPS, 0); } }
+    } else if (s_page == PAGE_FIND && key == BSP_BTN_OK) {
+        if (mqtt_service_publish_find_ring()) {
+            strlcpy(s_find_status, "已响铃，等待伙伴回应...", sizeof(s_find_status));
+            s_find_waiting = true; s_find_deadline = esp_timer_get_time() / 1000 + 30000;
+            sound_service_play(SOUND_TICK);
+        } else strlcpy(s_find_status, "MQTT离线\n无法发送响铃", sizeof(s_find_status));
+        render();
+    } else if (s_page == PAGE_RPS) {
+        if (game->state == GAME_STATE_INVITE_RECEIVED) { if (key == BSP_BTN_OK) game_service_respond_invite(true); else if (key == BSP_BTN_UP) { game_service_respond_invite(false); go(PAGE_GAMES, 1); } }
+        else if (game->state == GAME_STATE_WAITING_CHOICE) game_service_choose(key == BSP_BTN_UP ? RPS_ROCK : key == BSP_BTN_OK ? RPS_SCISSORS : RPS_PAPER);
+        else if (game->state == GAME_STATE_RESULT && key == BSP_BTN_OK) { game_service_cancel(); go(PAGE_GAMES, 1); }
+        else if (game->state == GAME_STATE_IDLE && key == BSP_BTN_OK) go(PAGE_GAMES, 1);
+    }
 }
+#if CONFIG_ENABLE_SCREENSHOT
+static void show_debug_page(app_debug_page_t target)
+{
+    static const page_t pages[APP_DEBUG_PAGE_COUNT] = {
+        PAGE_HOME, PAGE_TASKS, PAGE_REDEEM, PAGE_LOTTERY, PAGE_GAMES, PAGE_FIND, PAGE_RPS,
+    };
+    if (target < 0 || target >= APP_DEBUG_PAGE_COUNT) return;
+    s_debug_preview = true;
+    s_page = pages[target];
+    s_selected = 0;
+    s_message[0] = 0;
+    s_lottery_animating = false;
+    s_lottery_rotation = 0;
+    s_find_waiting = false;
+    s_find_deadline = 0;
+    if (s_page == PAGE_FIND) strlcpy(s_find_status, "调试预览 未发送响铃", sizeof(s_find_status));
+    else s_find_status[0] = 0;
+    ESP_LOGI(TAG, "debug页面=%d", target);
+    render();
+}
+#endif
 static void process_event(const app_event_t *event)
 {
     if (event->type == APP_EVT_KEY) {
         ESP_LOGI(TAG, "按键=%d event=%d", event->button, event->button_event);
+        if (s_ignore_key_until_release) {
+            if (event->button_event == BSP_BTN_LONG) s_ignore_ring_click = false;
+            if (event->button_event == BSP_BTN_RELEASE) s_ignore_key_until_release = false;
+            return;
+        }
+        if (s_ignore_ring_click) {
+            if (event->button_event == BSP_BTN_CLICK) { s_ignore_ring_click = false; return; }
+            if (event->button_event == BSP_BTN_PRESS) s_ignore_ring_click = false;
+        }
+        if (s_find_ringing) {
+            sound_service_stop_ring();
+            mqtt_service_publish_find_ack(s_find_sender);
+            s_find_ringing = false;
+            s_find_ring_deadline = 0;
+            s_find_sender[0] = 0;
+            s_ignore_key_until_release = event->button_event == BSP_BTN_PRESS;
+            s_ignore_ring_click = event->button_event == BSP_BTN_PRESS;
+            set_message("已告诉伙伴：我在这里", false);
+            render();
+            return;
+        }
+        if (event->button_event == BSP_BTN_RELEASE && event->button == BSP_BTN_DOWN && ptt_service_is_transmitting()) {
+            ptt_service_set_transmitting(false); render(); return;
+        }
         if (power_service_key_activity()) { s_suppress_wake_key = true; return; }
-        if (s_suppress_wake_key) { if (event->button_event == BSP_BTN_CLICK || event->button_event == BSP_BTN_LONG) s_suppress_wake_key = false; return; }
-        if (event->button == BSP_BTN_UP && event->button_event == BSP_BTN_LONG) { app_model_snapshot_t *model = model_snapshot(); if (model->pending_type == APP_PENDING_NONE) go(PAGE_HOME, 0); return; }
+        if (s_suppress_wake_key) {
+            if (event->button_event == BSP_BTN_CLICK || event->button_event == BSP_BTN_LONG || event->button_event == BSP_BTN_RELEASE) s_suppress_wake_key = false;
+            return;
+        }
+        if (event->button_event == BSP_BTN_LONG && event->button == BSP_BTN_DOWN && s_page == PAGE_FIND) {
+            if (ptt_service_available()) ptt_service_set_transmitting(true);
+            else set_message("对讲不可用\n需配对和80KB内存", true);
+            render(); return;
+        }
+        if (event->button_event == BSP_BTN_LONG && event->button == BSP_BTN_OK && (s_page == PAGE_HOME || s_page == PAGE_GAMES)) {
+            if (game_service_heap_allows_pairing()) { game_service_start_pairing(); go(PAGE_GAMES, 0); }
+            else { set_message("内存不足，无法配对", true); render(); }
+            return;
+        }
+        if (event->button == BSP_BTN_UP && event->button_event == BSP_BTN_LONG) {
+            app_model_snapshot_t *model = model_snapshot();
+            if (model->pending_type == APP_PENDING_NONE) { game_service_cancel(); go(PAGE_HOME, 0); }
+            return;
+        }
         if (event->button_event == BSP_BTN_CLICK) handle_short_key(event->button);
-    } else if (event->type == APP_EVT_MODEL_CHANGED) {
-        if (event->value) ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_cache_save_model());
-        render();
-    } else if (event->type == APP_EVT_ACTION_RESULT) {
-        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_cache_save_model());
-        app_model_snapshot_t *model = model_snapshot();
-        set_message(event->text, !event->ok);
-        if (event->ok) sound_service_play(SOUND_DING); else sound_service_play(SOUND_DU);
-        if (event->ok && model->pending_type == APP_PENDING_LOTTERY) go(PAGE_LOTTERY, 0); else render();
+#if CONFIG_ENABLE_SCREENSHOT
+    } else if (event->type == APP_EVT_DEBUG_PAGE) {
+        show_debug_page((app_debug_page_t)event->value);
+#endif
+    } else if (event->type == APP_EVT_FIND_RING) {
+        strlcpy(s_find_sender, event->text, sizeof(s_find_sender));
+        s_find_ringing = true; s_find_flash = true;
+        s_find_ring_deadline = esp_timer_get_time() / 1000 + 30000;
+        s_find_next_flash = esp_timer_get_time() / 1000 + 300;
+        ptt_service_set_transmitting(false);
+        power_service_wake(); sound_service_play(SOUND_FIND_RING); render();
+    } else if (event->type == APP_EVT_FIND_ACK) {
+        s_find_waiting = false; s_find_deadline = 0;
+        strlcpy(s_find_status, "伙伴已回应：找到了！", sizeof(s_find_status));
+        sound_service_play(SOUND_DING); render();
+    } else if (event->type == APP_EVT_MODEL_CHANGED) { if (event->value) ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_cache_save_model()); render(); }
+    else if (event->type == APP_EVT_ACTION_RESULT) {
+        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_cache_save_model()); app_model_snapshot_t *model = model_snapshot();
+        if (event->ok && model->pending_type == APP_PENDING_LOTTERY) set_message("兑换成功\n正在等待开奖...", false); else set_message(event->text, !event->ok);
+        sound_service_play(event->ok ? SOUND_DING : SOUND_DU); render();
     } else if (event->type == APP_EVT_LOTTERY_RESULT) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_cache_save_model());
-        s_page = PAGE_LOTTERY; sound_service_play(SOUND_FANFARE); render();
+        app_model_snapshot_t *model = model_snapshot();
+        s_page = PAGE_LOTTERY;
+        s_lottery_animating = true;
+        s_lottery_rotation = 0;
+        s_lottery_reveal_at = esp_timer_get_time() / 1000 + 2700;
+        sound_service_play(SOUND_TICK);
+        render();
+        if (bsp_lvgl_lock(100)) {
+            ui_lottery_start_spin(lottery_asset_index_for_reward(model->lottery_prize_id));
+            bsp_lvgl_unlock();
+        }
+    } else if (event->type == APP_EVT_GAME_UPDATE) {
+        game_snapshot_t *game = game_snapshot(); if (game->state == GAME_STATE_INVITE_RECEIVED) s_page = PAGE_RPS; render();
     } else if (event->type == APP_EVT_DATA_ERROR || event->type == APP_EVT_ACTION_TIMEOUT) {
         set_message(event->text[0] ? event->text : "请求超时，请重试", true); sound_service_play(SOUND_DU); render();
     } else render();
 }
 static void ui_task(void *arg)
 {
-    (void)arg; render(); ESP_LOGI(TAG, "UI启动 stack high-water=%u", (unsigned)uxTaskGetStackHighWaterMark(NULL)); app_event_t event; int64_t next_anim = 0;
+    (void)arg; render(); ESP_LOGI(TAG, "UI启动 stack high-water=%u", (unsigned)uxTaskGetStackHighWaterMark(NULL));
+    app_event_t event; int64_t next_game_tick = 0;
     for (;;) {
         if (xQueueReceive(app_events_queue(), &event, pdMS_TO_TICKS(100)) == pdTRUE) process_event(&event);
-        int64_t now = esp_timer_get_time() / 1000;
-        app_model_snapshot_t *model = model_snapshot();
-        if (model->pending_type != APP_PENDING_NONE && now >= model->pending_deadline_ms) { ESP_LOGW(TAG, "请求超时 key=%s", model->pending_key); app_model_finish_pending(); app_event_t timeout = {.type = APP_EVT_ACTION_TIMEOUT}; strlcpy(timeout.text, "请求超时，请重试", sizeof(timeout.text)); process_event(&timeout); }
-        if (s_page == PAGE_LOTTERY && !model->lottery_ready && now >= next_anim) { static const int route[8] = {0,1,2,5,8,7,6,3}; static int route_pos; s_lottery_highlight = route[route_pos++ % 8]; next_anim = now + 120; sound_service_play(SOUND_TICK); if (bsp_lvgl_lock(100)) { ui_lottery_set_highlight(s_lottery_highlight); bsp_lvgl_unlock(); } }
+        int64_t now = esp_timer_get_time() / 1000; app_model_snapshot_t *model = model_snapshot();
+        if (model->pending_type != APP_PENDING_NONE && now >= model->pending_deadline_ms) { ESP_LOGW(TAG, "请求超时 key=%s", model->pending_key);
+            app_model_finish_pending(); app_event_t timeout = {.type = APP_EVT_ACTION_TIMEOUT}; strlcpy(timeout.text, "请求超时，请重试", sizeof(timeout.text)); process_event(&timeout); }
+        if (now >= next_game_tick) { game_service_tick(now); next_game_tick = now + 200; }
+        if (s_find_waiting && now >= s_find_deadline) {
+            s_find_waiting = false; s_find_deadline = 0;
+            strlcpy(s_find_status, "30秒未回应\n可再次响铃", sizeof(s_find_status));
+            render();
+        }
+        if (s_find_ringing && now >= s_find_ring_deadline) {
+            sound_service_stop_ring();
+            s_find_ringing = false;
+            s_find_ring_deadline = 0;
+            s_find_flash = false;
+            s_find_sender[0] = 0;
+            s_find_status[0] = 0;
+            ESP_LOGI(TAG, "Find 被叫响铃已在30秒后自动停止，不发送ACK");
+            render();
+        }
+        if (s_find_ringing && now >= s_find_next_flash) {
+            s_find_flash = !s_find_flash; s_find_next_flash = now + 300; render();
+        }
+        if (s_lottery_animating && now >= s_lottery_reveal_at) { s_lottery_animating = false; sound_service_play(SOUND_FANFARE); render(); }
         if (s_message[0] && now >= s_message_until) { s_message[0] = 0; render(); }
     }
 }
-esp_err_t ui_app_start(void)
-{
-    if (xTaskCreatePinnedToCore(ui_task, "kp_ui", 4096, NULL, 3, NULL, 0) != pdPASS) return ESP_ERR_NO_MEM;
-    return ESP_OK;
-}
+esp_err_t ui_app_start(void) { return xTaskCreatePinnedToCore(ui_task, "kp_ui", 4096, NULL, 3, NULL, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM; }
 void ui_app_post_key(bsp_btn_t btn, bsp_btn_ev_t event) { app_event_post(&(app_event_t){.type = APP_EVT_KEY, .button = btn, .button_event = event}, 0); }

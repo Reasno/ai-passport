@@ -1,32 +1,71 @@
 #include "ui_lottery.h"
+#include "lottery_assets.h"
 #include "ui_common.h"
 #include <stdio.h>
-#include <string.h>
-static lv_obj_t *s_cells[9];
-static const char *CELLS[9] = {"麦当劳", "20元", "10分", "2元", "开始", "5分", "谢谢", "麦当劳", "2分"};
-lv_obj_t *ui_lottery_build(const app_model_snapshot_t *model, int highlight)
+
+#define LOTTERY_WHEEL_SIZE 176
+#define LOTTERY_SPIN_MS 2600
+
+static lv_obj_t *s_wheel;
+
+static void spin_exec(void *obj, int32_t value)
 {
-    lv_obj_t *screen = ui_common_screen("幸运抽奖", model);
-    if (model->lottery_ready) {
-        ui_common_label(screen, "恭 喜！", 20, 52, 200, LV_TEXT_ALIGN_CENTER, true);
-        char prize[96]; snprintf(prize, sizeof(prize), "抽中 %s", model->lottery_label[0] ? model->lottery_label : model->lottery_prize_id);
-        lv_obj_t *p = ui_common_label(screen, prize, 15, 106, 210, LV_TEXT_ALIGN_CENTER, false); lv_obj_set_style_text_color(p, lv_color_hex(KP_YELLOW), 0);
-        ui_common_label(screen, model->lottery_points_delta ? "已自动入账到账户" : "请去找爸爸妈妈兑奖", 10, 178, 220, LV_TEXT_ALIGN_CENTER, false);
-        ui_common_label(screen, model->lottery_message, 10, 218, 220, LV_TEXT_ALIGN_CENTER, false);
-        ui_common_footer(screen, "✓确认返回兑换页", false);
+    lv_image_set_rotation((lv_obj_t *)obj, value);
+}
+
+lv_obj_t *ui_lottery_build(const app_model_snapshot_t *model, int rotation, bool animating)
+{
+    lv_obj_t *screen = ui_common_screen("幸运开奖", model);
+    s_wheel = NULL;
+
+    if (model->lottery_ready && !animating) {
+        lv_obj_t *image = lv_image_create(screen);
+        lv_image_set_src(image, lottery_asset_for_reward(model->lottery_prize_id));
+        lv_obj_align(image, LV_ALIGN_TOP_MID, 0, 36);
+        lv_image_set_antialias(image, false);
+
+        const char *result = lottery_result_text(model->lottery_prize_id, model->lottery_label);
+        lv_obj_t *title = ui_common_label(screen, result, 8, 96, 224, LV_TEXT_ALIGN_CENTER, true);
+        lv_obj_set_style_text_color(title, lv_color_hex(KP_YELLOW), 0);
+
+        ui_common_label(screen,
+                        model->lottery_points_delta ? "奖励已自动入账" : "请找爸爸妈妈兑奖",
+                        10, 142, 220, LV_TEXT_ALIGN_CENTER, false);
+        ui_common_footer(screen, "中键确认返回兑换页", false);
         return screen;
     }
-    for (int i = 0; i < 9; i++) {
-        int x = 45 + (i % 3) * 50, y = 52 + (i / 3) * 50;
-        lv_obj_t *card = ui_common_card(screen, x, y, 48, 48, i == highlight, true); s_cells[i] = card;
-        ui_common_label(card, CELLS[i], 0, 8, 38, LV_TEXT_ALIGN_CENTER, false);
-    }
-    ui_common_label(screen, model->pending_type == APP_PENDING_LOTTERY ? "正在开奖，请等待结果..." : "高亮框快速移动中...", 10, 224, 220, LV_TEXT_ALIGN_CENTER, false);
+
+    s_wheel = lv_image_create(screen);
+    lv_image_set_src(s_wheel, &lottery_wheel);
+    lv_image_set_pivot(s_wheel, LOTTERY_WHEEL_SIZE / 2, LOTTERY_WHEEL_SIZE / 2);
+    lv_image_set_rotation(s_wheel, rotation);
+    lv_image_set_antialias(s_wheel, false);
+    lv_obj_align(s_wheel, LV_ALIGN_TOP_MID, 0, 28);
+
+    lv_obj_t *pointer = lv_label_create(screen);
+    lv_label_set_text(pointer, LV_SYMBOL_DOWN);
+    lv_obj_set_style_text_font(pointer, LV_FONT_DEFAULT, 0);
+    lv_obj_set_style_text_color(pointer, lv_color_hex(KP_RED), 0);
+    lv_obj_align(pointer, LV_ALIGN_TOP_MID, 0, 21);
+
+    ui_common_label(screen, "正在转动...", 10, 211, 220, LV_TEXT_ALIGN_CENTER, false);
     ui_common_footer(screen, "抽奖进行中，请等待", true);
     return screen;
 }
 
-void ui_lottery_set_highlight(int highlight)
+void ui_lottery_start_spin(int target_index)
 {
-    for (int i = 0; i < 9; i++) if (s_cells[i]) { lv_obj_set_style_bg_color(s_cells[i], lv_color_hex(i == highlight ? KP_YELLOW : KP_CARD), 0); lv_obj_set_style_border_width(s_cells[i], i == highlight ? 2 : 1, 0); lv_obj_set_style_border_color(s_cells[i], lv_color_hex(i == highlight ? 0xFFFFFF : KP_THEME), 0); }
+    if (!s_wheel) return;
+    if (target_index < 0 || target_index > 6) target_index = 0;
+
+    /* Seven full turns, then put the selected sector's centre under the top pointer. */
+    int32_t final_rotation = 7 * 3600 - (target_index * 3600 + 3) / 7;
+    lv_anim_t anim;
+    lv_anim_init(&anim);
+    lv_anim_set_var(&anim, s_wheel);
+    lv_anim_set_values(&anim, 0, final_rotation);
+    lv_anim_set_duration(&anim, LOTTERY_SPIN_MS);
+    lv_anim_set_exec_cb(&anim, spin_exec);
+    lv_anim_set_path_cb(&anim, lv_anim_path_ease_out);
+    lv_anim_start(&anim);
 }

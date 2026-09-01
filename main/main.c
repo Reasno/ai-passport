@@ -1,7 +1,12 @@
 #include "app_events.h"
 #include "app_model.h"
 #include "nvs_cache.h"
+#include "battery_service.h"
+#include "espnow_service.h"
+#include "game_service.h"
+#include "ptt_service.h"
 #include "power_service.h"
+#include "screenshot_service.h"
 #include "sound_service.h"
 #include "ui_app.h"
 #include "wifi_service.h"
@@ -28,11 +33,21 @@ void app_main(void)
     ESP_ERROR_CHECK(bsp_display_init());
     if (!bsp_lvgl_init()) { ESP_LOGE(TAG, "LVGL初始化失败"); return; }
     ESP_ERROR_CHECK(power_service_start());
+    ESP_ERROR_CHECK_WITHOUT_ABORT(battery_service_start());
     ESP_ERROR_CHECK(ui_app_start());
+    ESP_ERROR_CHECK_WITHOUT_ABORT(screenshot_service_start());
     ESP_ERROR_CHECK(bsp_button_init(on_key, NULL));
     esp_err_t audio = sound_service_start();
     if (audio != ESP_OK) ESP_LOGW(TAG, "音效不可用: %s", esp_err_to_name(audio));
     esp_err_t wifi = wifi_service_start();
     if (wifi != ESP_OK) ESP_LOGW(TAG, "WiFi后台启动失败: %s，继续离线模式", esp_err_to_name(wifi));
+    else {
+        esp_err_t now = espnow_service_start();
+        if (now == ESP_OK) {
+            ESP_ERROR_CHECK_WITHOUT_ABORT(game_service_start());
+            if (audio == ESP_OK) ESP_ERROR_CHECK_WITHOUT_ABORT(ptt_service_start());
+            else ESP_LOGW(TAG, "PTT灰化: 音频RX不可用（codec初始化失败）");
+        } else ESP_LOGW(TAG, "ESP-NOW互动不可用: %s", esp_err_to_name(now));
+    }
     xTaskCreatePinnedToCore(heap_log_task, "kp_heap", 2048, NULL, 1, NULL, 0);
 }

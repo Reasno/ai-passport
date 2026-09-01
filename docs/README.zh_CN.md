@@ -92,6 +92,31 @@ git switch -c feature/my-passport-app
 
 示例分支之间可能改变了同一菜单、配置或驱动。应先理解差异，再提取状态模型、资源流水线或并发模式；不能因为代码曾出现在示例分支，就把它当成当前 `main` 的 BSP 保证。
 
+## Kids Points 本机隐私配置
+
+孩子姓名和角色通过 `CONFIG_KP_CHILD_NAME`、`CONFIG_KP_CHILD_ROLE` 配置。仓库中的 `sdkconfig.defaults.example` 只提供占位值；请将真实姓名写入已被 `.gitignore` 忽略的本机 `sdkconfig.defaults`，不要提交包含儿童隐私信息的配置文件。
+
+```ini
+CONFIG_KP_CHILD_NAME="小朋友"
+CONFIG_KP_CHILD_ROLE="哥哥"
+```
+
+## USB 截图调试
+
+截图功能默认关闭，仅用于调试。把 `CONFIG_ENABLE_SCREENSHOT=y` 写入已忽略的本机 `sdkconfig.defaults` 后重新构建；设备通过 USB Serial/JTAG 收到 `SCREENSHOT\n` 时，会强制 LVGL 完整刷新，并复用现有 240×20 RGB565 DMA 绘制缓冲逐块输出，不申请 240×320 全屏缓冲。可先发送 `PAGE HOME|TASKS|REDEEM|LOTTERY|GAMES|FIND|RPS\n` 切换调试预览页；串口任务只投递 `APP_EVT_DEBUG_PAGE`，由 UI 任务构建页面。LOTTERY、FIND、RPS 预览不会发起 MQTT 响铃、兑换或 ESP-NOW 邀请。
+
+```bash
+python3 -m pip install pyserial Pillow
+python3 tools/screenshot.py --port /dev/cu.usbmodem1101 --page HOME --output home.png
+python3 tools/screenshot.py --port /dev/cu.usbmodem1101 --page LOTTERY --output lottery.png
+```
+
+`PAGE` 成功返回 `KP_PAGE_OK <NAME>`，失败返回 `KP_PAGE_ERR <REASON>`；主机工具默认等待 300ms 后再发送 `SCREENSHOT`。帧协议为 `KPSS2 240 320 RGB565LE KPRC\n`。每条记录为 little-endian `{char magic[4]="KPRC"; uint16 x1,y1,x2,y2; uint32 len}`、`len` 字节 RGB565LE 像素和 `uint32 record_crc32`；记录 CRC 覆盖记录头及像素。帧尾为 `KPSS_END <frame_crc32> <pixel_count>\n`，frame CRC 覆盖全部记录头及像素，不含逐记录 CRC。主机端扫描 `KPRC` 并校验坐标、长度和 CRC，因此可跳过普通串口日志或损坏记录并重新同步；二进制传输期间固件也会临时关闭 ESP 日志并强制 LF，结束后恢复。
+
+## Home 像素图标资源
+
+Home 的任务、礼物、游戏手柄图标由 `tools/generate_pixel_icons.py` 从 16×16 逻辑像素图确定性生成 32×32 RGB565A8 常量资源。每个逻辑像素展开为 2×2 物理像素，LVGL 以 1:1 图片显示；不使用 emoji、canvas、运行时解码或动态像素分配。三枚图标总像素数据为 9,216 字节 Flash。
+
 ## 项目结构
 
 ```text
