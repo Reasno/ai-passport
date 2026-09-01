@@ -38,6 +38,7 @@ static bool s_started;
 static bool s_client_started;
 static char s_uri[96], s_tasks_topic[96], s_tasks_items_prefix[112], s_rewards_items_prefix[112];
 static char s_lottery_child_topic[96], s_presence_topic[96], s_client_id[64], s_device_id[64];
+static char s_find_ring_topic[112], s_find_ack_topic[112];
 static char s_rx_topic[128];
 static char s_rx_data[APP_JSON_MAX + 1];
 static int s_rx_total;
@@ -290,9 +291,13 @@ static void handle_lottery(void)
     const char *key = json_string(root, "correlation_id");
     if (!key) key = json_string(root, "request_id");
     if (!key) key = json_string(root, "idempotency_key");
+    app_model_snapshot(&s_mqtt_event_model);
+    if (s_mqtt_event_model.pending_type != APP_PENDING_LOTTERY) {
+        ESP_LOGW(TAG, "忽略未由抽奖券兑换触发的抽奖结果"); cJSON_Delete(root); return;
+    }
     app_pending_type_t type;
-    if (key && !pending_matches_result(key, &type, NULL, 0)) {
-        ESP_LOGW(TAG, "忽略非当前抽奖结果 key=%s", key); cJSON_Delete(root); return;
+    if ((key && !pending_matches_result(key, &type, NULL, 0)) || (!key && child_topic)) {
+        ESP_LOGW(TAG, "忽略非当前抽奖结果 key=%s", key ? key : "(missing)"); cJSON_Delete(root); return;
     }
     cJSON_Delete(root);
     esp_err_t err = app_model_parse_lottery(s_rx_data, s_rx_total);
@@ -307,6 +312,20 @@ static void handle_lottery(void)
 
 static void handle_payload(void)
 {
+    if (topic_is(s_find_ring_topic) || topic_is(s_find_ack_topic)) {
+        cJSON *root = cJSON_ParseWithLength(s_rx_data, s_rx_total);
+        if (!root) { ESP_LOGW(TAG, "Find payload invalid JSON"); return; }
+        const char *sender = json_string(root, "sender");
+        if (!sender) sender = json_string(root, "device_id");
+        if (sender && strcmp(sender, CONFIG_KIDS_DEVICE_ID) != 0) {
+            app_event_t event = {.type = topic_is(s_find_ring_topic) ? APP_EVT_FIND_RING : APP_EVT_FIND_ACK};
+            strlcpy(event.text, sender, sizeof(event.text));
+            app_event_post(&event, 0);
+            ESP_LOGI(TAG, "Find %s from=%s", topic_is(s_find_ring_topic) ? "ring" : "ack", sender);
+        }
+        cJSON_Delete(root);
+        return;
+    }
     if (strncmp(s_rx_topic, "kids_points/action/result/", 27) == 0 || topic_is(TOPIC_ACTION_ERROR)) {
         handle_result(s_rx_data, s_rx_total); return;
     }
@@ -370,6 +389,8 @@ static void subscribe_all_roots(esp_mqtt_client_handle_t client)
     esp_mqtt_client_subscribe(client, TOPIC_ACTION_ERROR, 1);
     esp_mqtt_client_subscribe(client, TOPIC_LOTTERY_SHARED, 1);
     esp_mqtt_client_subscribe(client, s_lottery_child_topic, 1);
+    esp_mqtt_client_subscribe(client, s_find_ring_topic, 1);
+    esp_mqtt_client_subscribe(client, s_find_ack_topic, 1);
     subscribe_known_items();
 }
 
@@ -415,7 +436,9 @@ esp_err_t mqtt_service_start(void)
     snprintf(s_tasks_items_prefix, sizeof(s_tasks_items_prefix), "%s/items/", s_tasks_topic);
     snprintf(s_rewards_items_prefix, sizeof(s_rewards_items_prefix), "%s/items/", TOPIC_REWARDS);
     snprintf(s_lottery_child_topic, sizeof(s_lottery_child_topic), "kids_points/lottery_result/%s", CONFIG_ACTOR_CHILD_ID);
-    snprintf(s_device_id, sizeof(s_device_id), "ai_passport_%s", CONFIG_ACTOR_CHILD_ID);
+    strlcpy(s_device_id, CONFIG_KIDS_DEVICE_ID, sizeof(s_device_id));
+    snprintf(s_find_ring_topic, sizeof(s_find_ring_topic), "kids_points/game/find/%s/ring", CONFIG_KIDS_DEVICE_ID);
+    snprintf(s_find_ack_topic, sizeof(s_find_ack_topic), "kids_points/game/find/%s/ack", CONFIG_KIDS_DEVICE_ID);
     snprintf(s_client_id, sizeof(s_client_id), "ai_passport_%s_001", CONFIG_ACTOR_CHILD_ID);
     snprintf(s_presence_topic, sizeof(s_presence_topic), "kids_points/device/%s/online", s_device_id);
     esp_mqtt_client_config_t cfg = {
@@ -467,3 +490,23 @@ static bool publish_action(const char *item_field, const char *item_id, app_pend
 }
 bool mqtt_service_publish_complete_task(const char *task_id) { return publish_action("task_id", task_id, APP_PENDING_TASK); }
 bool mqtt_service_publish_redeem(const char *reward_id) { return publish_action("reward_id", reward_id, APP_PENDING_REDEEM); }
+
+static bool publish_find(const char *target, const char *suffix)
+{
+    app_model_snapshot(&s_mqtt_publish_model);
+    if (!s_client || !s_mqtt_publish_model.mqtt_online || !target || !target[0]) return false;
+    char topic[128];
+    snprintf(topic, sizeof(topic), "kids_points/game/find/%s/%s", target, suffix);
+    cJSON *root = cJSON_CreateObject();
+    if (!root) return false;
+    cJSON_AddStringToObject(root, "sender", CONFIG_KIDS_DEVICE_ID);
+    cJSON_AddNumberToObject(root, "timestamp_ms", (double)(esp_timer_get_time() / 1000));
+    char *payload = cJSON_PrintUnformatted(root);
+    int msg_id = payload ? esp_mqtt_client_publish(s_client, topic, payload, 0, 1, false) : -1;
+    cJSON_free(payload);
+    cJSON_Delete(root);
+    ESP_LOGI(TAG, "Find publish topic=%s msg_id=%d", topic, msg_id);
+    return msg_id >= 0;
+}
+bool mqtt_service_publish_find_ring(void) { return publish_find(CONFIG_KIDS_PEER_DEVICE_ID, "ring"); }
+bool mqtt_service_publish_find_ack(const char *target_device_id) { return publish_find(target_device_id, "ack"); }

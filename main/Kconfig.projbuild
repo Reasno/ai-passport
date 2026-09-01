@@ -31,12 +31,46 @@ config ACTOR_CHILD_ID
     default "brother" if KIDS_ACTOR_BROTHER
     default "sister" if KIDS_ACTOR_SISTER
 
+config KP_CHILD_NAME
+    string "Home 页面显示的孩子姓名"
+    default "小朋友"
+    help
+        仅用于本机 Home 页面显示。请在已忽略的 sdkconfig.defaults 中配置真实姓名，
+        不要将孩子真实姓名提交到源码或 sdkconfig.defaults.example。
+
+config KP_CHILD_ROLE
+    string "Home 页面显示的孩子角色"
+    default "小朋友"
+    help
+        仅用于本机 Home 页面显示，例如哥哥或妹妹。
+
+config KIDS_DEVICE_ID
+    string "本机互动设备 ID"
+    default "brother_device" if KIDS_ACTOR_BROTHER
+    default "sister_device" if KIDS_ACTOR_SISTER
+    help
+        Find MQTT topic 中标识本机；同一家庭内必须唯一。
+
+config KIDS_PEER_DEVICE_ID
+    string "伙伴互动设备 ID"
+    default "sister_device" if KIDS_ACTOR_BROTHER
+    default "brother_device" if KIDS_ACTOR_SISTER
+    help
+        Find 按键响铃的目标设备 ID。
+
 config KIDS_USE_OFFICIAL_AVATAR
     bool "Use built-in official avatar artwork"
     default y
     help
         Show the checked-in RGB565A8 brother/sister artwork directly from flash.
         Disable only to use the small vector fallback avatar.
+
+config ENABLE_SCREENSHOT
+    bool "Enable USB Serial/JTAG screenshot command"
+    default n
+    help
+        Debug-only SCREENSHOT command. It streams LVGL's existing 20-row flush
+        chunks as RGB565LE and never allocates a full-screen framebuffer.
 
 config KIDS_THEME_SISTER
     bool

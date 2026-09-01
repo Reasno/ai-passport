@@ -3,6 +3,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
 #include <math.h>
 #include <stdint.h>
@@ -11,6 +12,17 @@
 #define CHUNK 160
 static const char *TAG = "kp_sound";
 static QueueHandle_t s_queue;
+static SemaphoreHandle_t s_audio_lock;
+static volatile bool s_stop_ring;
+
+bool sound_service_audio_lock(TickType_t wait)
+{
+    return s_audio_lock && xSemaphoreTake(s_audio_lock, wait) == pdTRUE;
+}
+void sound_service_audio_unlock(void)
+{
+    if (s_audio_lock) xSemaphoreGive(s_audio_lock);
+}
 
 static void tone(float start_hz, float end_hz, int duration_ms, bool decay)
 {
@@ -29,26 +41,52 @@ static void tone(float start_hz, float end_hz, int duration_ms, bool decay)
         bsp_audio_write(pcm, n * sizeof(int16_t));
     }
 }
+static void find_ring(void)
+{
+    for (int round = 0; round < 3 && !s_stop_ring; round++) {
+        tone(880, 880, 130, true);
+        vTaskDelay(pdMS_TO_TICKS(80));
+        if (s_stop_ring) break;
+        tone(1175, 1175, 160, true);
+        if (round < 2) vTaskDelay(pdMS_TO_TICKS(280));
+    }
+}
 static void sound_task(void *arg)
 {
     (void)arg;
-    if (bsp_audio_set_format(RATE, 16, 1) != ESP_OK) { ESP_LOGE(TAG, "音频格式初始化失败"); vTaskDelete(NULL); }
-    bsp_audio_set_volume(55);
     sound_effect_t effect;
     while (xQueueReceive(s_queue, &effect, portMAX_DELAY)) {
+        if (!sound_service_audio_lock(portMAX_DELAY)) continue;
+        if (bsp_audio_set_format(RATE, 16, 1) != ESP_OK) {
+            ESP_LOGE(TAG, "音频格式初始化失败");
+            sound_service_audio_unlock();
+            continue;
+        }
+        bsp_audio_set_volume(55);
         if (effect == SOUND_TICK) tone(800, 800, 50, true);
         else if (effect == SOUND_DING) tone(440, 880, 200, false);
         else if (effect == SOUND_DU) tone(200, 200, 150, true);
+        else if (effect == SOUND_FIND_RING) find_ring();
         else { tone(523, 523, 150, false); tone(659, 659, 150, false); tone(784, 784, 200, false); }
+        sound_service_audio_unlock();
     }
 }
 esp_err_t sound_service_start(void)
 {
     esp_err_t err = bsp_audio_init();
     if (err != ESP_OK) return err;
-    s_queue = xQueueCreate(4, sizeof(sound_effect_t));
-    if (!s_queue) return ESP_ERR_NO_MEM;
+    s_audio_lock = xSemaphoreCreateMutex();
+    s_queue = xQueueCreate(6, sizeof(sound_effect_t));
+    if (!s_audio_lock || !s_queue) return ESP_ERR_NO_MEM;
     if (xTaskCreatePinnedToCore(sound_task, "kp_sound", 3072, NULL, 3, NULL, 0) != pdPASS) return ESP_ERR_NO_MEM;
     return ESP_OK;
 }
-void sound_service_play(sound_effect_t effect) { if (s_queue) xQueueSend(s_queue, &effect, 0); }
+void sound_service_play(sound_effect_t effect)
+{
+    if (effect == SOUND_FIND_RING) s_stop_ring = false;
+    if (s_queue) xQueueSend(s_queue, &effect, 0);
+}
+void sound_service_stop_ring(void)
+{
+    s_stop_ring = true;
+}

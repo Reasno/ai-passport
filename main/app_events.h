@@ -13,7 +13,27 @@ typedef enum {
     APP_EVT_LOTTERY_RESULT,
     APP_EVT_DATA_ERROR,
     APP_EVT_ACTION_TIMEOUT,
+    APP_EVT_GAME_UPDATE,
+    APP_EVT_FIND_RING,
+    APP_EVT_FIND_ACK,
+    APP_EVT_STATUS_UPDATE,
+#if CONFIG_ENABLE_SCREENSHOT
+    APP_EVT_DEBUG_PAGE,
+#endif
 } app_event_type_t;
+
+#if CONFIG_ENABLE_SCREENSHOT
+typedef enum {
+    APP_DEBUG_PAGE_HOME,
+    APP_DEBUG_PAGE_TASKS,
+    APP_DEBUG_PAGE_REDEEM,
+    APP_DEBUG_PAGE_LOTTERY,
+    APP_DEBUG_PAGE_GAMES,
+    APP_DEBUG_PAGE_FIND,
+    APP_DEBUG_PAGE_RPS,
+    APP_DEBUG_PAGE_COUNT,
+} app_debug_page_t;
+#endif
 
 typedef struct {
     app_event_type_t type;

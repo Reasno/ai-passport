@@ -37,10 +37,20 @@ esp_err_t power_service_start(void)
     return err;
 }
 
+void power_service_wake(void)
+{
+    s_last_activity_ms = esp_timer_get_time() / 1000;
+    if (s_level < 80) {
+        s_level = 80;
+        bsp_display_backlight(80);
+        ESP_LOGI(TAG, "远程提醒唤醒背光");
+    }
+}
+
 bool power_service_key_activity(void)
 {
     bool consume = s_level < 80;
-    s_last_activity_ms = esp_timer_get_time() / 1000;
-    if (consume) { s_level = 80; bsp_display_backlight(80); ESP_LOGI(TAG, "按键唤醒背光，消费本次操作"); }
+    power_service_wake();
+    if (consume) ESP_LOGI(TAG, "按键唤醒背光，消费本次操作");
     return consume;
 }
