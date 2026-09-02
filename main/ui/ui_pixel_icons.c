@@ -36,12 +36,20 @@ static const lv_image_dsc_t *icon_source(ui_pixel_icon_t icon, uint8_t scale)
     }
 }
 
-static const lv_image_dsc_t *full_color_source(ui_pixel_icon_t icon)
+/* ARGB8888 artwork keeps its own colours and alpha, so it must never be recoloured.
+ * Scale mirrors the legacy pixel-icon scale: 2 = list row, 3 = card, >=5 = hero. */
+static const lv_image_dsc_t *full_color_source(ui_pixel_icon_t icon, uint8_t scale)
 {
     switch (icon) {
-    case UI_PIXEL_ICON_RADAR: return &logo_05_find_sibling;
-    case UI_PIXEL_ICON_RPS: return &logo_06_rock_paper_scissors;
-    case UI_PIXEL_ICON_TICKET: return &logo_07_lucky_wheel;
+    case UI_PIXEL_ICON_TASK: return scale >= 3 ? &logo_02_tasks : &logo_02_tasks_s;
+    case UI_PIXEL_ICON_GIFT: return scale >= 3 ? &logo_03_rewards_m : &logo_03_rewards;
+    case UI_PIXEL_ICON_TV: return &logo_03_rewards_m;
+    case UI_PIXEL_ICON_GAME: return scale >= 3 ? &logo_04_games_m : &logo_04_games;
+    case UI_PIXEL_ICON_RADAR:
+        if (scale >= 5) return &logo_05_find_sibling_l;
+        return scale >= 3 ? &logo_05_find_sibling_m : &logo_05_find_sibling;
+    case UI_PIXEL_ICON_RPS: return scale >= 3 ? &logo_06_rock_paper_scissors_m : &logo_06_rock_paper_scissors;
+    case UI_PIXEL_ICON_TICKET: return scale >= 3 ? &logo_07_lucky_wheel_m : &logo_07_lucky_wheel;
     default: return NULL;
     }
 }
@@ -49,7 +57,7 @@ static const lv_image_dsc_t *full_color_source(ui_pixel_icon_t icon)
 lv_obj_t *ui_pixel_icon_create(lv_obj_t *parent, ui_pixel_icon_t icon, int x, int y,
                                uint32_t color, uint8_t scale)
 {
-    const lv_image_dsc_t *full_color = full_color_source(icon);
+    const lv_image_dsc_t *full_color = full_color_source(icon, scale);
     const lv_image_dsc_t *source = full_color ? full_color : icon_source(icon, scale);
     if (!source) return NULL;
     lv_obj_t *image = lv_image_create(parent);

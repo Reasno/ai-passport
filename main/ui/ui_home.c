@@ -55,10 +55,11 @@ lv_obj_t *ui_home_build(const app_model_snapshot_t *model, int selected)
     lv_obj_t *band = lv_obj_create(screen); lv_obj_set_pos(band, 0, 118); lv_obj_set_size(band, 240, 90);
     lv_obj_set_style_bg_color(band, lv_color_hex(KP_BG), 0); lv_obj_set_style_bg_opa(band, LV_OPA_COVER, 0); lv_obj_set_style_border_width(band, 0, 0); lv_obj_set_style_radius(band, 0, 0);
     lv_obj_t *avatar = ui_avatar_create(screen, 106, 1);
-    lv_obj_t *app_logo = lv_image_create(screen);
-    lv_image_set_src(app_logo, &logo_01_app_logo);
-    lv_image_set_antialias(app_logo, false);
-    lv_obj_set_pos(app_logo, 6, 24);
+    /* Text header: the child's name in the large Chinese font, left column only so
+     * that it never runs under the avatar or the status bar. */
+    lv_obj_t *name = ui_common_label(screen, CONFIG_KP_CHILD_NAME, 6, 62, 96, LV_TEXT_ALIGN_CENTER, true);
+    lv_obj_set_style_text_color(name, lv_color_hex(KP_THEME), 0);
+    lv_obj_set_height(name, 32);
     lv_obj_t *role_badge = pill(screen, 21, 120, 62, 24, 0x172B35);
     pill_label(role_badge, CONFIG_KP_CHILD_ROLE, UI_FONT_SMALL, KP_MUTED_LIGHT, 1);
     lv_obj_t *balance = pill(screen, 8, 154, 108, 44, 0x3A3017);

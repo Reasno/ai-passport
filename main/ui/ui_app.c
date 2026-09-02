@@ -33,7 +33,9 @@ static char s_message[128]; static bool s_message_error; static int64_t s_messag
 static int s_lottery_rotation; static bool s_lottery_animating; static int64_t s_lottery_reveal_at;
 static bool s_suppress_wake_key;
 #if CONFIG_ENABLE_SCREENSHOT
+typedef enum { DEBUG_LOTTERY_IDLE, DEBUG_LOTTERY_SPIN, DEBUG_LOTTERY_RESULT } debug_lottery_t;
 static bool s_debug_preview;
+static debug_lottery_t s_debug_lottery;
 #endif
 static bool s_find_waiting, s_find_ringing, s_find_flash, s_ignore_key_until_release, s_ignore_ring_click;
 static int64_t s_find_deadline, s_find_ring_deadline, s_find_next_flash;
@@ -60,6 +62,11 @@ static void render(void)
         game->peer_nearby = true;
         game->rssi = -54;
         game->distance_bars = 4;
+    } else if (s_debug_preview && s_page == PAGE_LOTTERY && s_debug_lottery == DEBUG_LOTTERY_RESULT) {
+        model->lottery_ready = true;
+        model->lottery_points_delta = 10;
+        strlcpy(model->lottery_prize_id, "points10", sizeof(model->lottery_prize_id));
+        strlcpy(model->lottery_label, "积分x10", sizeof(model->lottery_label));
     } else if (s_debug_preview && s_page == PAGE_RPS) {
         game->state = GAME_STATE_WAITING_CHOICE;
         game->seconds_left = 10;
@@ -74,7 +81,7 @@ static void render(void)
     else if (s_page == PAGE_CONFIRM) screen = ui_confirm_build(model, s_confirm_kind, s_confirm_name, s_confirm_points, s_selected);
     else if (s_page == PAGE_LOTTERY) screen = ui_lottery_build(model, s_lottery_rotation,
 #if CONFIG_ENABLE_SCREENSHOT
-                                                               s_lottery_animating || s_debug_preview
+                                                               s_lottery_animating || (s_debug_preview && s_debug_lottery == DEBUG_LOTTERY_SPIN)
 #else
                                                                s_lottery_animating
 #endif
@@ -141,11 +148,11 @@ static void handle_short_key(bsp_btn_t key)
     else if (s_page == PAGE_GAMES) {
         if (key != BSP_BTN_OK) key_move(delta, 2);
         else if (!game->paired) { set_message("请长按B3先配对", false); render(); }
-        else if (s_selected == 0) { if (!game_service_heap_allows_radar()) { set_message("内存不足\n找伙伴暂不可用", true); render(); } else { game_service_set_radar(true); s_find_status[0] = 0; s_find_waiting = false; go(PAGE_FIND, 0); } }
+        else if (s_selected == 0) { if (!game_service_heap_allows_radar()) { set_message("内存不足\n找" KP_PEER_LABEL "暂不可用", true); render(); } else { game_service_set_radar(true); s_find_status[0] = 0; s_find_waiting = false; go(PAGE_FIND, 0); } }
         else { if (!game_service_heap_allows_rps()) { set_message("内存不足，对战不可用", true); render(); } else { game_service_invite_rps(); go(PAGE_RPS, 0); } }
     } else if (s_page == PAGE_FIND && key == BSP_BTN_OK) {
         if (mqtt_service_publish_find_ring()) {
-            strlcpy(s_find_status, "已响铃，等待伙伴回应...", sizeof(s_find_status));
+            strlcpy(s_find_status, "已响铃，等待" KP_PEER_LABEL "回应...", sizeof(s_find_status));
             s_find_waiting = true; s_find_deadline = esp_timer_get_time() / 1000 + 30000;
             sound_service_play(SOUND_TICK);
         } else strlcpy(s_find_status, "MQTT离线\n无法发送响铃", sizeof(s_find_status));
@@ -162,14 +169,18 @@ static void show_debug_page(app_debug_page_t target)
 {
     static const page_t pages[APP_DEBUG_PAGE_COUNT] = {
         PAGE_HOME, PAGE_TASKS, PAGE_REDEEM, PAGE_LOTTERY, PAGE_GAMES, PAGE_FIND, PAGE_RPS,
+        PAGE_LOTTERY, PAGE_LOTTERY,
     };
     if (target < 0 || target >= APP_DEBUG_PAGE_COUNT) return;
     s_debug_preview = true;
+    s_debug_lottery = target == APP_DEBUG_PAGE_LOTTERY_SPIN ? DEBUG_LOTTERY_SPIN
+                    : target == APP_DEBUG_PAGE_LOTTERY_RESULT ? DEBUG_LOTTERY_RESULT
+                    : DEBUG_LOTTERY_IDLE;
     s_page = pages[target];
     s_selected = 0;
     s_message[0] = 0;
     s_lottery_animating = false;
-    s_lottery_rotation = 0;
+    s_lottery_rotation = s_debug_lottery == DEBUG_LOTTERY_SPIN ? 1150 : 0;
     s_find_waiting = false;
     s_find_deadline = 0;
     if (s_page == PAGE_FIND) strlcpy(s_find_status, "调试预览 未发送响铃", sizeof(s_find_status));
@@ -199,7 +210,7 @@ static void process_event(const app_event_t *event)
             s_find_sender[0] = 0;
             s_ignore_key_until_release = event->button_event == BSP_BTN_PRESS;
             s_ignore_ring_click = event->button_event == BSP_BTN_PRESS;
-            set_message("已告诉伙伴：我在这里", false);
+            set_message("已告诉" KP_PEER_LABEL "：我在这里", false);
             render();
             return;
         }
@@ -240,7 +251,7 @@ static void process_event(const app_event_t *event)
         power_service_wake(); sound_service_play(SOUND_FIND_RING); render();
     } else if (event->type == APP_EVT_FIND_ACK) {
         s_find_waiting = false; s_find_deadline = 0;
-        strlcpy(s_find_status, "伙伴已回应：找到了！", sizeof(s_find_status));
+        strlcpy(s_find_status, KP_PEER_LABEL "已回应：找到了！", sizeof(s_find_status));
         sound_service_play(SOUND_DING); render();
     } else if (event->type == APP_EVT_MODEL_CHANGED) { if (event->value) ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_cache_save_model()); render(); }
     else if (event->type == APP_EVT_ACTION_RESULT) {

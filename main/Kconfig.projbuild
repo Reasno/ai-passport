@@ -58,6 +58,13 @@ config KIDS_PEER_DEVICE_ID
     help
         Find 按键响铃的目标设备 ID。
 
+config KP_PEER_LABEL
+    string
+    default "妹妹" if KIDS_ACTOR_BROTHER
+    default "哥哥" if KIDS_ACTOR_SISTER
+    help
+        互动页面对伙伴的称呼，跟随 KIDS_ACTOR 自动切换：哥哥的设备找妹妹，妹妹的设备找哥哥。
+
 config KIDS_USE_OFFICIAL_AVATAR
     bool "Use built-in official avatar artwork"
     default y

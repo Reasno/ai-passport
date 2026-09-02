@@ -83,7 +83,7 @@ def static_source_chars():
         if not path.is_file():
             continue
         text = path.read_text(encoding="utf-8")
-        for key in ("KP_CHILD_NAME", "KP_CHILD_ROLE"):
+        for key in ("KP_CHILD_NAME", "KP_CHILD_ROLE", "KP_PEER_LABEL"):
             match = re.search(rf'^CONFIG_{key}="(.*)"$', text, re.M)
             if match:
                 chars.extend(c for c in match.group(1) if ord(c) >= 0x80)

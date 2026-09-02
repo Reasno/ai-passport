@@ -1,7 +1,12 @@
 #pragma once
 
 #include <stddef.h>
+#include "sdkconfig.h"
 #include "lvgl.h"
+
+/* Peer wording follows the bound child: the brother's device looks for 妹妹,
+ * the sister's device looks for 哥哥. Compile-time only, no runtime branch. */
+#define KP_PEER_LABEL CONFIG_KP_PEER_LABEL
 
 /* Standard-size text is capped at 10 Unicode code points per explicit line.
  * Overflow is represented as the first 9 code points plus one ellipsis.

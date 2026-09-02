@@ -2,6 +2,7 @@
 #include "ptt_service.h"
 #include "ui_common.h"
 #include "ui_pixel_icons.h"
+#include "ui_text.h"
 #include "esp_system.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -66,7 +67,7 @@ lv_obj_t *ui_games_build(const app_model_snapshot_t *model, const game_snapshot_
     const char *pair = game->paired ? "已配对 长按B3重配" : "未配对 长按B3配对";
     ui_common_label_small(screen, pair, 12, 31, 216, LV_TEXT_ALIGN_CENTER);
     game_card(screen, 52, selected == 0, game_service_heap_allows_radar() && game->paired,
-              UI_PIXEL_ICON_RADAR, "找伙伴", game->paired ? "响铃和近距离信号" : "请先完成配对");
+              UI_PIXEL_ICON_RADAR, "找" KP_PEER_LABEL, game->paired ? "响铃和近距离信号" : "请先完成配对");
     game_card(screen, 126, selected == 1, game_service_heap_allows_rps() && game->paired,
               UI_PIXEL_ICON_RPS, "石头剪刀布", game->paired ? "纯娱乐 不增减积分" : "请先完成配对");
     char heap[48]; snprintf(heap, sizeof(heap), "可用内存 %lu KB", (unsigned long)(esp_get_free_heap_size() / 1024));
@@ -80,20 +81,20 @@ lv_obj_t *ui_games_build(const app_model_snapshot_t *model, const game_snapshot_
 lv_obj_t *ui_find_build(const app_model_snapshot_t *model, const game_snapshot_t *game,
                         const char *find_status, bool waiting)
 {
-    lv_obj_t *screen = ui_common_screen("找伙伴", model);
+    lv_obj_t *screen = ui_common_screen("找" KP_PEER_LABEL, model);
     lv_obj_t *radar = ui_radar_icon_create(screen, 0, 0, KP_THEME, 5);
-    if (radar) lv_obj_align(radar, LV_ALIGN_TOP_MID, 0, 32);
-    const char *who = game->peer_nearby ? "伙伴就在附近" : "等待近距离信号";
-    ui_common_label(screen, who, 20, 99, 200, LV_TEXT_ALIGN_CENTER, true);
+    if (radar) lv_obj_align(radar, LV_ALIGN_TOP_MID, 0, 26);
+    const char *who = game->peer_nearby ? KP_PEER_LABEL "就在附近" : "等待近距离信号";
+    ui_common_label(screen, who, 20, 102, 200, LV_TEXT_ALIGN_CENTER, true);
     char rssi[48];
     snprintf(rssi, sizeof(rssi), game->peer_nearby ? "信号 %d dBm" : "信号扫描中...", game->rssi);
-    ui_common_label_small(screen, rssi, 20, 136, 200, LV_TEXT_ALIGN_CENTER);
+    ui_common_label_small(screen, rssi, 20, 138, 200, LV_TEXT_ALIGN_CENTER);
     for (int i = 0; i < 5; i++) {
         lv_obj_t *bar = lv_obj_create(screen); lv_obj_set_pos(bar, 55 + i * 28, 184 - i * 5);
         lv_obj_set_size(bar, 18, 10 + i * 5); lv_obj_set_style_border_width(bar, 0, 0);
         lv_obj_set_style_radius(bar, 3, 0); lv_obj_set_style_bg_color(bar, lv_color_hex(i < game->distance_bars ? KP_GREEN : KP_CARD), 0);
     }
-    const char *status = find_status && find_status[0] ? find_status : (model->mqtt_online ? "可让伙伴响铃" : "MQTT离线\n响铃不可用");
+    const char *status = find_status && find_status[0] ? find_status : (model->mqtt_online ? "可让" KP_PEER_LABEL "响铃" : "MQTT离线\n响铃不可用");
     lv_obj_t *s = ui_common_label_small(screen, status, 12, 213, 216, LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_text_color(s, lv_color_hex(waiting ? KP_YELLOW : (model->mqtt_online ? KP_MUTED_LIGHT : KP_RED)), 0);
     bool ptt = ptt_service_available();

@@ -4,7 +4,8 @@
 #include "ui_common.h"
 #include <stdio.h>
 
-#define LOTTERY_WHEEL_SIZE 176
+#define LOTTERY_WHEEL_SIZE 152
+#define LOTTERY_WHEEL_TOP 44
 #define LOTTERY_SPIN_MS 2600
 
 static lv_obj_t *s_wheel;
@@ -41,15 +42,17 @@ lv_obj_t *ui_lottery_build(const app_model_snapshot_t *model, int rotation, bool
     lv_image_set_pivot(s_wheel, LOTTERY_WHEEL_SIZE / 2, LOTTERY_WHEEL_SIZE / 2);
     lv_image_set_rotation(s_wheel, rotation);
     lv_image_set_antialias(s_wheel, false);
-    lv_obj_align(s_wheel, LV_ALIGN_TOP_MID, 0, 28);
+    lv_obj_align(s_wheel, LV_ALIGN_TOP_MID, 0, LOTTERY_WHEEL_TOP);
 
     lv_obj_t *pointer = lv_label_create(screen);
     lv_label_set_text(pointer, LV_SYMBOL_DOWN);
     lv_obj_set_style_text_font(pointer, LV_FONT_DEFAULT, 0);
     lv_obj_set_style_text_color(pointer, lv_color_hex(KP_RED), 0);
-    lv_obj_align(pointer, LV_ALIGN_TOP_MID, 0, 21);
+    lv_obj_align(pointer, LV_ALIGN_TOP_MID, 0, LOTTERY_WHEEL_TOP - 18);
 
-    ui_common_label(screen, "正在转动...", 10, 195, 220, LV_TEXT_ALIGN_CENTER, false);
+    /* Status band starts below the wheel so no text can sit on the artwork. */
+    ui_common_label(screen, animating ? "正在转动..." : "等待开奖结果...", 10,
+                    LOTTERY_WHEEL_TOP + LOTTERY_WHEEL_SIZE + 14, 220, LV_TEXT_ALIGN_CENTER, false);
     ui_common_footer(screen, "B1 B2选择  B3确认  长按B1主页", false);
     return screen;
 }
