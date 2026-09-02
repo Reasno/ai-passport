@@ -178,8 +178,13 @@ static void handle_short_key(bsp_btn_t key)
         }
         render();
     } else if (s_page == PAGE_RPS) {
-        if (game->state == GAME_STATE_INVITE_RECEIVED) { if (key == BSP_BTN_OK) game_service_respond_invite(true); else if (key == BSP_BTN_UP) { game_service_respond_invite(false); go(PAGE_GAMES, 1); } }
-        else if (game->state == GAME_STATE_WAITING_CHOICE) game_service_choose(key == BSP_BTN_UP ? RPS_ROCK : key == BSP_BTN_OK ? RPS_SCISSORS : RPS_PAPER);
+        if (game->state == GAME_STATE_INVITE_RECEIVED) {
+            if (key == BSP_BTN_OK) game_service_respond_invite(true);
+            else if (key == BSP_BTN_DOWN) { game_service_respond_invite(false); go(PAGE_GAMES, 1); }
+        } else if (game->state == GAME_STATE_WAITING_CHOICE) {
+            if (key == BSP_BTN_OK) game_service_choose(game->cursor_choice);
+            else game_service_move_choice(key == BSP_BTN_UP ? -1 : 1);
+        }
         else if (game->state == GAME_STATE_RESULT && key == BSP_BTN_OK) { game_service_cancel(); go(PAGE_GAMES, 1); }
         else if (game->state == GAME_STATE_IDLE && key == BSP_BTN_OK) go(PAGE_GAMES, 1);
     }

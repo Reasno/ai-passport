@@ -48,26 +48,6 @@ lv_obj_t *ui_common_label_small(lv_obj_t *parent, const char *text, int x, int y
     lv_label_set_text(label, safe); return label;
 }
 
-static void label_small_two_lines(lv_obj_t *parent, const char *text, int x, int y, int w,
-                                 lv_text_align_t align, lv_color_t color)
-{
-    if (!text) text = "";
-    const char *nl = strchr(text, '\n');
-    if (!nl) {
-        lv_obj_t *l = ui_common_label_small(parent, text, x, y, w, align);
-        lv_obj_set_style_text_color(l, color, 0);
-        return;
-    }
-    char line1[128], line2[128];
-    size_t n1 = (size_t)(nl - text);
-    if (n1 >= sizeof(line1)) n1 = sizeof(line1) - 1;
-    memcpy(line1, text, n1); line1[n1] = 0;
-    strlcpy(line2, nl + 1, sizeof(line2));
-    lv_obj_t *l1 = ui_common_label_small(parent, line1, x, y, w, align);
-    lv_obj_t *l2 = ui_common_label_small(parent, line2, x, y + 16, w, align);
-    lv_obj_set_style_text_color(l1, color, 0);
-    lv_obj_set_style_text_color(l2, color, 0);
-}
 static void update_time_label(bool wifi_online)
 {
     if (!s_time_text) return;
@@ -225,7 +205,8 @@ lv_obj_t *ui_common_find_overlay(lv_obj_t *screen, bool bright)
     lv_obj_set_style_border_color(box, lv_color_hex(KP_YELLOW), 0);
     ui_radar_icon_create(box, 88, 8, KP_YELLOW, 3);
     ui_common_label(box, KP_PEER_LABEL "正在找你！", 8, 56, 192, LV_TEXT_ALIGN_CENTER, true);
-    label_small_two_lines(box, "按任意键停止\n并回应", 8, 82, 192, LV_TEXT_ALIGN_CENTER,
-                         lv_color_hex(KP_TEXT));
+    ui_common_label(box, "按任意键停止", 8, 86, 192, LV_TEXT_ALIGN_CENTER, true);
+    /* The ringing overlay owns the footer; do not leak the underlying page controls. */
+    ui_common_footer(screen, "按任意键停止", false);
     return box;
 }

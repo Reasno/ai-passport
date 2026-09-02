@@ -114,7 +114,7 @@ static void play_packet(const ptt_audio_packet_t *packet)
     if (bsp_audio_set_format(8000, 16, 1) == ESP_OK) {
         int16_t pcm[PTT_SAMPLES_PER_PACKET];
         for (int i = 0; i < PTT_SAMPLES_PER_PACKET; i++) pcm[i] = ulaw_to_linear(packet->audio[i]);
-        bsp_audio_set_volume(60);
+        bsp_audio_set_volume(100);
         if (bsp_audio_write(pcm, sizeof(pcm)) != ESP_OK) ESP_LOGW(TAG, "PTT playback write failed");
     }
     sound_service_audio_unlock();

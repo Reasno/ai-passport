@@ -62,7 +62,7 @@ static void sound_task(void *arg)
             sound_service_audio_unlock();
             continue;
         }
-        bsp_audio_set_volume(55);
+        bsp_audio_set_volume(100);
         if (effect == SOUND_TICK) tone(800, 800, 50, true);
         else if (effect == SOUND_DING) tone(440, 880, 200, false);
         else if (effect == SOUND_DU) tone(200, 200, 150, true);

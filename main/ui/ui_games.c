@@ -134,21 +134,28 @@ lv_obj_t *ui_find_build(const app_model_snapshot_t *model, const game_snapshot_t
 lv_obj_t *ui_rps_build(const app_model_snapshot_t *model, const game_snapshot_t *game)
 {
     lv_obj_t *screen = ui_common_screen("石头剪刀布", model);
-    rps_choice_card(screen, 8, &s_rps_rock, "石头", game->local_choice == RPS_ROCK);
-    rps_choice_card(screen, 87, &s_rps_scissors, "剪刀", game->local_choice == RPS_SCISSORS);
-    rps_choice_card(screen, 166, &s_rps_paper, "布", game->local_choice == RPS_PAPER);
+    rps_choice_t shown = game->local_choice != RPS_NONE ? game->local_choice : game->cursor_choice;
+    rps_choice_card(screen, 8, &s_rps_rock, "石头", shown == RPS_ROCK);
+    rps_choice_card(screen, 87, &s_rps_scissors, "剪刀", shown == RPS_SCISSORS);
+    rps_choice_card(screen, 166, &s_rps_paper, "布", shown == RPS_PAPER);
     ui_common_label(screen, game->status, 12, 137, 216, LV_TEXT_ALIGN_CENTER, false);
+    const char *footer = "长按B1主页";
     if (game->state == GAME_STATE_WAITING_CHOICE) {
-        ui_common_label_small(screen, "B1石头  B3剪刀  B2布", 6, 178, 228, LV_TEXT_ALIGN_CENTER);
+        ui_common_label_small(screen, game->local_choice == RPS_NONE ? "选择后按确认出拳" : "已锁定出拳，等待对方", 6, 178, 228, LV_TEXT_ALIGN_CENTER);
+        footer = game->local_choice == RPS_NONE
+                     ? "B1 B2选择  B3确认  长按B1主页"
+                     : "等待对方  长按B1主页";
     } else if (game->state == GAME_STATE_INVITE_RECEIVED) {
-        ui_common_label(screen, "B1拒绝 B3接受", 20, 178, 200, LV_TEXT_ALIGN_CENTER, false);
+        ui_common_label(screen, "B2拒绝 B3接受", 20, 178, 200, LV_TEXT_ALIGN_CENTER, false);
+        footer = "B2拒绝  B3接受  长按B1主页";
     } else if (game->state == GAME_STATE_RESULT) {
         ui_common_label_small(screen, "纯娱乐 不增减积分", 12, 178, 216, LV_TEXT_ALIGN_CENTER);
         ui_common_label(screen, "B3返回互动游戏", 12, 203, 216, LV_TEXT_ALIGN_CENTER, false);
+        footer = "B3返回  长按B1主页";
     } else {
         char left[40]; snprintf(left, sizeof(left), "剩余 %lu 秒", (unsigned long)game->seconds_left);
         ui_common_label(screen, left, 20, 178, 200, LV_TEXT_ALIGN_CENTER, false);
     }
-    ui_common_footer(screen, "B1 B2选择  B3确认  长按B1主页", false);
+    ui_common_footer(screen, footer, false);
     return screen;
 }
