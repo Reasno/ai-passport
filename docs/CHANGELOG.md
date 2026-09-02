@@ -6,7 +6,7 @@
 
 ## Unreleased
 
-- Updated the find-sibling entry footer with the B1 home, B2 push-to-talk, and B3 ring actions while preserving the waiting-page cancel hint; removed redundant footer hints from the rock-paper-scissors result screen and made B1 require a long press there.
+- Updated the find-sibling entry footer with the B1 home, B2 push-to-talk, and B3 ring actions while preserving the waiting-page cancel hint; clarified the rock-paper-scissors result footer and made B1 require a long press there.
 - Made mini-program BLE install compatibility a template-level invariant: fixed
   protected `cardid`/Recovery partitions, retained the five-second UP-key
   Recovery boot hook, and added CI validation for merged-image structure,

@@ -142,7 +142,6 @@ lv_obj_t *ui_rps_build(const app_model_snapshot_t *model, const game_snapshot_t 
     rps_choice_card(screen, 166, &s_rps_paper, "布", shown == RPS_PAPER);
     ui_common_label(screen, game->status, 12, 153, 216, LV_TEXT_ALIGN_CENTER, false);
     const char *footer = "长按B1主页";
-    bool show_footer = true;
     if (game->state == GAME_STATE_WAITING_CHOICE) {
         ui_common_label_small(screen, game->local_choice == RPS_NONE ? "选择后按确认出拳" : "已锁定出拳，等待对方", 6, 194, 228, LV_TEXT_ALIGN_CENTER);
         footer = game->local_choice == RPS_NONE
@@ -152,7 +151,7 @@ lv_obj_t *ui_rps_build(const app_model_snapshot_t *model, const game_snapshot_t 
         ui_common_label(screen, "B2拒绝 B3接受", 20, 194, 200, LV_TEXT_ALIGN_CENTER, false);
         footer = "B2拒绝  B3接受  长按B1主页";
     } else if (game->state == GAME_STATE_RESULT) {
-        show_footer = false;
+        footer = "长按B1主页  B3再来一局";
     } else if (game->state == GAME_STATE_COUNTDOWN) {
         /* The centered status already says 即将开始; deliberately show no seconds. */
     } else {
@@ -160,6 +159,6 @@ lv_obj_t *ui_rps_build(const app_model_snapshot_t *model, const game_snapshot_t 
         snprintf(left, sizeof(left), "剩余 %lu 秒", (unsigned long)game->seconds_left);
         ui_common_label(screen, left, 20, 194, 200, LV_TEXT_ALIGN_CENTER, false);
     }
-    if (show_footer) ui_common_footer(screen, footer, false);
+    ui_common_footer(screen, footer, false);
     return screen;
 }
