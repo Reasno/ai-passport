@@ -185,23 +185,6 @@ static void screenshot_task(void *arg)
     }
 }
 
-/* Runs above the LVGL port task so it still reports while lower-priority tasks
- * are blocked or starved; this is how a hung UI task gets diagnosed on-device.
- * ui_task publishes the stage it is entering, so a frozen value names the exact
- * call that is not returning. */
-extern volatile int g_kp_ui_stage;
-extern volatile unsigned g_kp_ui_loops;
-extern volatile int g_kp_ui_event;
-
-static void taskdump_task(void *arg)
-{
-    (void)arg;
-    for (;;) {
-        vTaskDelay(pdMS_TO_TICKS(3000));
-        ESP_LOGW("kp_tasks", "ui_stage=%d ui_event=%d ui_loops=%u free=%u",
-                 g_kp_ui_stage, g_kp_ui_event, g_kp_ui_loops, (unsigned)esp_get_free_heap_size());
-    }
-}
 
 esp_err_t screenshot_service_start(void)
 {
@@ -212,7 +195,6 @@ esp_err_t screenshot_service_start(void)
     if (xTaskCreatePinnedToCore(screenshot_task, "kp_shot", 6144, display, 1, NULL, 0) != pdPASS) {
         return ESP_ERR_NO_MEM;
     }
-    xTaskCreatePinnedToCore(taskdump_task, "kp_tasks", 3072, NULL, 6, NULL, 0);
     return ESP_OK;
 }
 
