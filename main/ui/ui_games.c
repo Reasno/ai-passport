@@ -190,9 +190,13 @@ lv_obj_t *ui_buzzer_build(const app_model_snapshot_t *model, const buzzer_game_s
     lv_obj_set_style_bg_color(card, lv_color_hex(KP_CARD), 0);
     lv_obj_set_style_border_color(card, lv_color_hex(KP_THEME), 0);
     lv_obj_set_style_border_width(card, 1, 0);
+    lv_obj_set_style_pad_all(card, 0, 0);
     lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
-    /* 3 × 48 px lights with 14 px gaps form a 172 × 48 group.  Starting at
-     * (22, 22) puts its visual centre exactly on the 216 × 92 card centre. */
+    /* Card: (12, 38), 216 × 92.  Lights: diameter 48, gap 14.
+     * Group width = 48 × 3 + 14 × 2 = 172.
+     * Relative start x = (216 - 172) / 2 = 22; y = (92 - 48) / 2 = 22.
+     * Clear the card's theme padding above so these coordinates are measured
+     * from the card itself rather than from its padded content area. */
     for (int i = 0; i < 3; ++i) buzzer_light(card, 22 + i * 62, i < game->lights_on);
 
     const char *role = game->is_host ? "HOST" : "CLIENT";
