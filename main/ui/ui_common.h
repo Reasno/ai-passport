@@ -4,7 +4,11 @@
 #define KP_BG 0x0D1B2A
 #define KP_BG_MID 0x0D1B2A
 #define KP_CARD 0x17263B
+#ifdef CONFIG_KIDS_THEME_SISTER
+#define KP_CARD_ALT 0x4A2341
+#else
 #define KP_CARD_ALT 0x1A3A5C
+#endif
 #define KP_TEXT 0xF4F8FF
 #define KP_MUTED 0x728198
 #define KP_MUTED_LIGHT 0xA8B5C7
