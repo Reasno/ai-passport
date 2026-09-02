@@ -46,7 +46,9 @@ static void rps_choice_card(lv_obj_t *screen, int x, const lv_image_dsc_t *image
     lv_image_set_src(image, image_source);
     lv_image_set_antialias(image, false);
     lv_obj_align(image, LV_ALIGN_TOP_MID, 0, 4);
-    lv_obj_t *caption = ui_common_label_small(card, label, 6, 78, 54, LV_TEXT_ALIGN_CENTER);
+    lv_obj_t *caption = ui_common_label_small(card, label, 0, 0, 66, LV_TEXT_ALIGN_CENTER);
+    lv_obj_set_width(caption, lv_pct(100));
+    lv_obj_align(caption, LV_ALIGN_BOTTOM_MID, 0, -1);
     lv_obj_set_style_text_color(caption, lv_color_hex(selected ? KP_TEXT : KP_MUTED_LIGHT), 0);
 }
 
