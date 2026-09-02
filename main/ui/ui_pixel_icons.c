@@ -88,3 +88,29 @@ lv_obj_t *ui_radar_icon_create(lv_obj_t *parent, int x, int y, uint32_t color, u
 {
     return ui_pixel_icon_create(parent, UI_PIXEL_ICON_RADAR, x, y, color, scale);
 }
+
+lv_obj_t *ui_buzzer_icon_create(lv_obj_t *parent, int x, int y, bool enabled, uint8_t scale)
+{
+    (void)scale;
+    lv_obj_t *icon = lv_obj_create(parent);
+    lv_obj_set_pos(icon, x, y);
+    lv_obj_set_size(icon, 34, 18);
+    lv_obj_set_style_bg_opa(icon, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(icon, 0, 0);
+    lv_obj_set_style_pad_all(icon, 0, 0);
+    lv_obj_clear_flag(icon, LV_OBJ_FLAG_SCROLLABLE);
+
+    const uint32_t fill = enabled ? 0xFF334D : KP_MUTED;
+    const uint32_t rim = enabled ? 0xFF7A8C : 0x526075;
+    for (int i = 0; i < 3; ++i) {
+        lv_obj_t *light = lv_obj_create(icon);
+        lv_obj_set_pos(light, 1 + i * 11, 4);
+        lv_obj_set_size(light, 10, 10);
+        lv_obj_set_style_radius(light, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_bg_color(light, lv_color_hex(fill), 0);
+        lv_obj_set_style_border_color(light, lv_color_hex(rim), 0);
+        lv_obj_set_style_border_width(light, 1, 0);
+        lv_obj_clear_flag(light, LV_OBJ_FLAG_SCROLLABLE);
+    }
+    return icon;
+}

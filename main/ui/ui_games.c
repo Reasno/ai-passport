@@ -58,6 +58,8 @@ static void game_card(lv_obj_t *screen, int y, bool selected, bool enabled, ui_p
     lv_obj_t *card = ui_common_card(screen, 12, y, 216, 52, selected, enabled);
     lv_obj_t *image = icon == UI_PIXEL_ICON_RADAR
                           ? ui_radar_icon_create(card, 0, 0, enabled ? KP_THEME : KP_MUTED, 3)
+                      : icon == UI_PIXEL_ICON_BUZZER
+                          ? ui_buzzer_icon_create(card, 0, 0, enabled, 3)
                           : ui_pixel_icon_create(card, icon, 0, 0, enabled ? KP_THEME : KP_MUTED, 3);
     if (image) lv_obj_align(image, LV_ALIGN_LEFT_MID, 14, 0);
     ui_common_label(card, title, 56, 2, 148, LV_TEXT_ALIGN_LEFT, false);
@@ -79,7 +81,7 @@ lv_obj_t *ui_games_build(const app_model_snapshot_t *model, const game_snapshot_
     game_card(screen, 105, selected == 1, game_service_heap_allows_rps() && game->paired,
               UI_PIXEL_ICON_RPS, "石头剪刀布", game->paired ? "纯娱乐 不增减积分" : "请先完成配对");
     game_card(screen, 163, selected == 2, game_service_heap_allows_rps() && game->paired,
-              UI_PIXEL_ICON_RPS, "三灯抢答", game->paired ? "B3 抢答 纯娱乐" : "请先完成配对");
+              UI_PIXEL_ICON_BUZZER, "抢答器", game->paired ? "B3 抢答 纯娱乐" : "请先完成配对");
     char heap[48]; snprintf(heap, sizeof(heap), "可用内存 %lu KB", (unsigned long)(esp_get_free_heap_size() / 1024));
     lv_obj_t *h = ui_common_label_small(screen, heap, 12, 222, 216, LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_text_color(h, lv_color_hex(KP_MUTED), 0);
@@ -168,7 +170,7 @@ lv_obj_t *ui_rps_build(const app_model_snapshot_t *model, const game_snapshot_t 
 static lv_obj_t *buzzer_light(lv_obj_t *parent, int x, bool on)
 {
     lv_obj_t *light = lv_obj_create(parent);
-    lv_obj_set_pos(light, x, 18);
+    lv_obj_set_pos(light, x, 22);
     lv_obj_set_size(light, 48, 48);
     lv_obj_set_style_radius(light, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(light, lv_color_hex(on ? 0xFF334D : 0x364254), 0);
@@ -180,7 +182,7 @@ static lv_obj_t *buzzer_light(lv_obj_t *parent, int x, bool on)
 
 lv_obj_t *ui_buzzer_build(const app_model_snapshot_t *model, const buzzer_game_snapshot_t *game)
 {
-    lv_obj_t *screen = ui_common_screen("三灯抢答", model);
+    lv_obj_t *screen = ui_common_screen("抢答器", model);
     lv_obj_t *card = lv_obj_create(screen);
     lv_obj_set_pos(card, 12, 38);
     lv_obj_set_size(card, 216, 92);
@@ -189,7 +191,9 @@ lv_obj_t *ui_buzzer_build(const app_model_snapshot_t *model, const buzzer_game_s
     lv_obj_set_style_border_color(card, lv_color_hex(KP_THEME), 0);
     lv_obj_set_style_border_width(card, 1, 0);
     lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
-    for (int i = 0; i < 3; ++i) buzzer_light(card, 18 + i * 62, i < game->lights_on);
+    /* 3 × 48 px lights with 14 px gaps form a 172 × 48 group.  Starting at
+     * (22, 22) puts its visual centre exactly on the 216 × 92 card centre. */
+    for (int i = 0; i < 3; ++i) buzzer_light(card, 22 + i * 62, i < game->lights_on);
 
     const char *role = game->is_host ? "HOST" : "CLIENT";
     if (game->state == BUZZER_STATE_IDLE) role = "READY";
