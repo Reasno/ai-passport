@@ -206,7 +206,14 @@ lv_obj_t *ui_common_find_overlay(lv_obj_t *screen, bool bright)
     ui_radar_icon_create(box, 88, 8, KP_YELLOW, 3);
     ui_common_label(box, KP_PEER_LABEL "正在找你！", 8, 56, 192, LV_TEXT_ALIGN_CENTER, true);
     ui_common_label(box, "按任意键停止", 8, 86, 192, LV_TEXT_ALIGN_CENTER, true);
-    /* The ringing overlay owns the footer; do not leak the underlying page controls. */
+    /* The ringing overlay owns the footer; keep it above every page/overlay object
+     * and use the alert color so the receiver instruction cannot disappear. */
     ui_common_footer(screen, "按任意键停止", false);
+    lv_obj_t *footer = lv_obj_get_child(screen, -1);
+    if (footer) {
+        lv_obj_move_foreground(footer);
+        lv_obj_t *footer_label = lv_obj_get_child(footer, 0);
+        if (footer_label) lv_obj_set_style_text_color(footer_label, lv_color_hex(KP_YELLOW), 0);
+    }
     return box;
 }

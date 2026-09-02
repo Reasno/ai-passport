@@ -129,7 +129,7 @@ lv_obj_t *ui_find_build(const app_model_snapshot_t *model, const game_snapshot_t
     bool ptt = ptt_service_available();
     lv_obj_t *p = ui_common_label_small(screen, ptt ? (ptt_service_is_transmitting() ? "正在说话 松开B2结束" : "长按B2对讲") : "对讲不可用", 12, 240, 216, LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_text_color(p, lv_color_hex(ptt ? KP_GREEN : KP_MUTED), 0);
-    ui_common_footer(screen, "B1 B2选择  B3确认  长按B1主页", false);
+    ui_common_footer(screen, waiting ? "等待对方回应" : "B1 B2选择  B3确认  长按B1主页", false);
     return screen;
 }
 
