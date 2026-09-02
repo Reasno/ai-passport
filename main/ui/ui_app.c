@@ -77,6 +77,7 @@ static void render(void)
     } else if (s_debug_preview && s_page == PAGE_RPS) {
         game->state = GAME_STATE_WAITING_CHOICE;
         game->seconds_left = 10;
+        game->tenths_left = 100;
         strlcpy(game->status, "请选择出拳", sizeof(game->status));
     }
 #endif
@@ -313,7 +314,8 @@ static void process_event(const app_event_t *event)
              * to the previous page until it is explicitly rebuilt. */
             s_page = PAGE_RPS;
             render();
-        } else if (s_page == PAGE_RPS && game->state == GAME_STATE_IDLE && strcmp(game->status, "对方退出了游戏") == 0)
+        } else if (s_page == PAGE_RPS && game->state == GAME_STATE_IDLE &&
+                   (strcmp(game->status, "对方退出了游戏") == 0 || strcmp(game->status, "邀请已超时") == 0))
             go(PAGE_HOME, 0);
         else render();
     } else if (event->type == APP_EVT_DATA_ERROR || event->type == APP_EVT_ACTION_TIMEOUT) {

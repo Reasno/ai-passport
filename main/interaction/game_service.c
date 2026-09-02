@@ -170,7 +170,20 @@ void game_service_tick(int64_t now)
         s_last_rps_tx = now;
         espnow_service_send(ESPNOW_MSG_RPS_CHOICE, s_game.session, 0, s_game.local_choice, 0, false);
     }
-    if (s_game.state == GAME_STATE_INVITE_SENT && now >= s_deadline) { s_game.state = GAME_STATE_IDLE; status("对方没有回应"); changed = true; }
+    if (s_game.state == GAME_STATE_INVITE_SENT && now >= s_deadline) {
+        s_game.state = GAME_STATE_IDLE; s_game.local_choice = s_game.remote_choice = RPS_NONE;
+        s_game.result = 0; s_game.countdown = 0; s_game.seconds_left = 0; s_game.tenths_left = 0;
+        s_choice_acked = false; s_invite_receiver = false; s_deadline = 0;
+        status("对方没有回应"); changed = true;
+    }
+    if (s_game.state == GAME_STATE_INVITE_RECEIVED && now >= s_deadline) {
+        /* A received invitation owns the RPS page too. Reset every round field so
+         * stale state cannot keep the UI key handler trapped after timeout. */
+        s_game.state = GAME_STATE_IDLE; s_game.local_choice = s_game.remote_choice = RPS_NONE;
+        s_game.result = 0; s_game.countdown = 0; s_game.seconds_left = 0; s_game.tenths_left = 0;
+        s_choice_acked = false; s_invite_receiver = false; s_deadline = 0;
+        status("邀请已超时"); changed = true;
+    }
     if (s_game.state == GAME_STATE_COUNTDOWN) {
         int elapsed = (int)((now - s_countdown_started) / 1000);
         uint8_t count = elapsed >= RPS_COUNTDOWN_SECONDS ? 0 : RPS_COUNTDOWN_SECONDS - elapsed;
@@ -180,7 +193,14 @@ void game_service_tick(int64_t now)
     if (s_game.state == GAME_STATE_WAITING_CHOICE && now >= s_deadline) { s_game.state = GAME_STATE_RESULT; s_game.result = s_game.local_choice != RPS_NONE ? 1 : -1; status(s_game.result > 0 ? "对方超时，你赢了！" : "出拳超时"); changed = true; }
     if (s_game.radar_active && now - s_last_ping >= 1000) { s_last_ping = now; espnow_service_send(ESPNOW_MSG_RADAR_PING, 0, 0, 0, 0, false); }
     if (s_game.radar_active && s_game.peer_nearby && now - s_last_radar_rx >= RADAR_LOST_MS) { s_game.peer_nearby = false; s_game.distance_bars = 0; changed = true; }
-    if (s_deadline > now) s_game.seconds_left = (uint32_t)((s_deadline - now + 999) / 1000); else s_game.seconds_left = 0;
+    uint32_t seconds_left = s_deadline > now ? (uint32_t)((s_deadline - now + 999) / 1000) : 0;
+    uint16_t tenths_left = s_deadline > now ? (uint16_t)((s_deadline - now + 99) / 100) : 0;
+    if (seconds_left != s_game.seconds_left || tenths_left != s_game.tenths_left) {
+        s_game.seconds_left = seconds_left;
+        s_game.tenths_left = tenths_left;
+        if (s_game.state == GAME_STATE_INVITE_SENT || s_game.state == GAME_STATE_INVITE_RECEIVED)
+            changed = true;
+    }
     xSemaphoreGive(s_lock); if (changed) notify();
 }
 void game_service_on_packet(const uint8_t src[6], const espnow_game_packet_t *p, int8_t rssi)
