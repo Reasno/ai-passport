@@ -67,7 +67,9 @@ lv_obj_t *ui_common_screen(const char *title, const app_model_snapshot_t *model)
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
     lv_obj_t *bar = ui_statusbar_create(screen, model);
     (void)bar;
-    lv_obj_t *title_label = ui_common_label(screen, title, 34, 1, 172, LV_TEXT_ALIGN_CENTER, false);
+    /* Keep sub-page headers compact: title-only content on the left, status on the right. */
+    lv_obj_t *title_label = ui_common_label(screen, title, 8, 1, 144, LV_TEXT_ALIGN_LEFT, false);
+    lv_obj_set_height(title_label, 19);
     lv_obj_set_style_text_color(title_label, lv_color_hex(KP_TEXT), 0);
     return screen;
 }
@@ -102,16 +104,28 @@ lv_obj_t *ui_common_card(lv_obj_t *parent, int x, int y, int w, int h, bool sele
 void ui_common_footer(lv_obj_t *screen, const char *text, bool loading)
 {
     lv_obj_t *bar = lv_obj_create(screen); base_obj(bar); lv_obj_set_pos(bar, 0, 288); lv_obj_set_size(bar, 240, 32);
-    lv_obj_set_style_bg_color(bar, lv_color_hex(KP_BG), 0); lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, 0); lv_obj_set_style_border_width(bar, 1, 0);
-    lv_obj_set_style_border_color(bar, lv_color_hex(0x263951), 0); lv_obj_set_style_border_side(bar, LV_BORDER_SIDE_TOP, 0);
-    ui_common_label_small(bar, loading ? "请稍候..." : text, 2, 7, 236, LV_TEXT_ALIGN_CENTER);
+    lv_obj_set_style_bg_color(bar, lv_color_hex(KP_BG), 0); lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(bar, 0, 0);
+    lv_obj_t *label = lv_label_create(bar);
+    lv_obj_set_width(label, 236); lv_obj_set_height(label, 18);
+    lv_obj_set_style_text_font(label, UI_FONT_SMALL, 0); lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_color(label, lv_color_hex(loading ? KP_YELLOW : KP_MUTED), 0);
+    lv_obj_set_style_pad_top(label, 0, 0); lv_obj_set_style_pad_bottom(label, 0, 0);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP); lv_label_set_text(label, loading ? "请稍候..." : text);
+    lv_obj_align(label, LV_ALIGN_CENTER, 0, -1);
 }
 void ui_common_message(lv_obj_t *screen, const char *text, bool error)
 {
     lv_obj_t *box = ui_common_card(screen, 12, 238, 216, 42, false, true);
     lv_obj_set_style_bg_color(box, lv_color_hex(error ? 0x592A35 : 0x183D37), 0);
     lv_obj_set_style_border_color(box, lv_color_hex(error ? KP_RED : KP_GREEN), 0);
-    ui_common_label(box, text, 5, 1, 198, LV_TEXT_ALIGN_CENTER, false);
+    lv_obj_t *label = lv_label_create(box);
+    lv_obj_set_width(label, 198); lv_obj_set_height(label, 34);
+    lv_obj_set_style_text_font(label, UI_FONT_BODY, 0); lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_color(label, lv_color_hex(KP_TEXT), 0);
+    lv_obj_set_style_pad_top(label, 0, 0); lv_obj_set_style_pad_bottom(label, 0, 0);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP); lv_label_set_text(label, text);
+    lv_obj_align(label, LV_ALIGN_CENTER, 0, -1);
 }
 void ui_common_find_overlay(lv_obj_t *screen, bool bright)
 {

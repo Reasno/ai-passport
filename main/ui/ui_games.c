@@ -3,7 +3,49 @@
 #include "ui_common.h"
 #include "ui_pixel_icons.h"
 #include "esp_system.h"
+#include <stdint.h>
 #include <stdio.h>
+
+#define RPS_ART_WIDTH 54
+#define RPS_ART_HEIGHT 72
+#define RPS_ART_BYTES (RPS_ART_WIDTH * RPS_ART_HEIGHT * 2)
+
+extern const uint8_t rps_rock_data[] asm("_binary_rock_54x72_rgb565_start");
+extern const uint8_t rps_scissors_data[] asm("_binary_scissors_54x72_rgb565_start");
+extern const uint8_t rps_paper_data[] asm("_binary_paper_54x72_rgb565_start");
+
+#define RPS_IMAGE(name, data_ptr) \
+    static const lv_image_dsc_t name = { \
+        .header.magic = LV_IMAGE_HEADER_MAGIC, \
+        .header.cf = LV_COLOR_FORMAT_RGB565, \
+        .header.flags = 0, \
+        .header.w = RPS_ART_WIDTH, \
+        .header.h = RPS_ART_HEIGHT, \
+        .header.stride = RPS_ART_WIDTH * 2, \
+        .data_size = RPS_ART_BYTES, \
+        .data = data_ptr, \
+    }
+
+RPS_IMAGE(s_rps_rock, rps_rock_data);
+RPS_IMAGE(s_rps_scissors, rps_scissors_data);
+RPS_IMAGE(s_rps_paper, rps_paper_data);
+
+static void rps_choice_card(lv_obj_t *screen, int x, const lv_image_dsc_t *image_source,
+                            const char *label, bool selected)
+{
+    lv_obj_t *card = ui_common_card(screen, x, 29, 66, 98, false, true);
+    lv_obj_t *marker = lv_obj_get_child(card, 0);
+    if (marker) lv_obj_add_flag(marker, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_style_bg_color(card, lv_color_hex(selected ? KP_CARD_ALT : KP_CARD), 0);
+    lv_obj_set_style_border_color(card, lv_color_hex(selected ? KP_THEME : 0x263951), 0);
+    lv_obj_set_style_border_width(card, selected ? 2 : 1, 0);
+    lv_obj_t *image = lv_image_create(card);
+    lv_image_set_src(image, image_source);
+    lv_image_set_antialias(image, false);
+    lv_obj_align(image, LV_ALIGN_TOP_MID, 0, 4);
+    lv_obj_t *caption = ui_common_label_small(card, label, 6, 78, 54, LV_TEXT_ALIGN_CENTER);
+    lv_obj_set_style_text_color(caption, lv_color_hex(selected ? KP_TEXT : KP_MUTED_LIGHT), 0);
+}
 
 static void game_card(lv_obj_t *screen, int y, bool selected, bool enabled, ui_pixel_icon_t icon,
                       const char *title, const char *detail)
@@ -61,20 +103,20 @@ lv_obj_t *ui_find_build(const app_model_snapshot_t *model, const game_snapshot_t
 lv_obj_t *ui_rps_build(const app_model_snapshot_t *model, const game_snapshot_t *game)
 {
     lv_obj_t *screen = ui_common_screen("石头剪刀布", model);
-    ui_pixel_icon_create(screen, UI_PIXEL_ICON_RPS, 84, 31, KP_THEME, 6);
-    ui_common_label(screen, game->status, 12, 117, 216, LV_TEXT_ALIGN_CENTER, false);
+    rps_choice_card(screen, 8, &s_rps_rock, "石头", game->local_choice == RPS_ROCK);
+    rps_choice_card(screen, 87, &s_rps_scissors, "剪刀", game->local_choice == RPS_SCISSORS);
+    rps_choice_card(screen, 166, &s_rps_paper, "布", game->local_choice == RPS_PAPER);
+    ui_common_label(screen, game->status, 12, 137, 216, LV_TEXT_ALIGN_CENTER, false);
     if (game->state == GAME_STATE_WAITING_CHOICE) {
-        ui_common_label(screen, "上键 石头", 5, 165, 76, LV_TEXT_ALIGN_CENTER, false);
-        ui_common_label(screen, "中键 剪刀", 82, 165, 76, LV_TEXT_ALIGN_CENTER, false);
-        ui_common_label(screen, "下键 布", 159, 165, 76, LV_TEXT_ALIGN_CENTER, false);
+        ui_common_label_small(screen, "上键石头  中键剪刀  下键布", 6, 178, 228, LV_TEXT_ALIGN_CENTER);
     } else if (game->state == GAME_STATE_INVITE_RECEIVED) {
-        ui_common_label(screen, "上键拒绝 中键接受", 20, 171, 200, LV_TEXT_ALIGN_CENTER, false);
+        ui_common_label(screen, "上键拒绝 中键接受", 20, 178, 200, LV_TEXT_ALIGN_CENTER, false);
     } else if (game->state == GAME_STATE_RESULT) {
-        ui_common_label_small(screen, "纯娱乐 不增减积分", 12, 175, 216, LV_TEXT_ALIGN_CENTER);
-        ui_common_label(screen, "中键返回互动游戏", 12, 198, 216, LV_TEXT_ALIGN_CENTER, false);
+        ui_common_label_small(screen, "纯娱乐 不增减积分", 12, 178, 216, LV_TEXT_ALIGN_CENTER);
+        ui_common_label(screen, "中键返回互动游戏", 12, 203, 216, LV_TEXT_ALIGN_CENTER, false);
     } else {
         char left[40]; snprintf(left, sizeof(left), "剩余 %lu 秒", (unsigned long)game->seconds_left);
-        ui_common_label(screen, left, 20, 175, 200, LV_TEXT_ALIGN_CENTER, false);
+        ui_common_label(screen, left, 20, 178, 200, LV_TEXT_ALIGN_CENTER, false);
     }
     ui_common_footer(screen, "本地娱乐对战", false);
     return screen;

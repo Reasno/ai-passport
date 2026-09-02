@@ -9,14 +9,37 @@ static lv_obj_t *pill(lv_obj_t *parent, int x, int y, int w, int h, uint32_t col
 {
     lv_obj_t *obj = lv_obj_create(parent); lv_obj_set_pos(obj, x, y); lv_obj_set_size(obj, w, h);
     lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLLABLE); lv_obj_set_style_pad_all(obj, 0, 0);
-    lv_obj_set_style_border_width(obj, 0, 0); lv_obj_set_style_radius(obj, h / 2, 0); lv_obj_set_style_bg_color(obj, lv_color_hex(color), 0); return obj;
+    lv_obj_set_style_border_width(obj, 0, 0); lv_obj_set_style_radius(obj, h / 2, 0);
+    lv_obj_set_style_bg_color(obj, lv_color_hex(color), 0); lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, 0);
+    return obj;
+}
+
+static lv_obj_t *pill_label(lv_obj_t *parent, const char *text, const lv_font_t *font,
+                            uint32_t color, int y)
+{
+    lv_obj_t *label = lv_label_create(parent);
+    lv_obj_set_style_text_font(label, font, 0);
+    lv_obj_set_style_text_color(label, lv_color_hex(color), 0);
+    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_pad_top(label, 0, 0);
+    lv_obj_set_style_pad_bottom(label, 0, 0);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
+    lv_label_set_text(label, text);
+    lv_obj_align(label, LV_ALIGN_CENTER, 0, y);
+    return label;
 }
 static void entry(lv_obj_t *screen, int x, bool selected, ui_pixel_icon_t icon, const char *text)
 {
-    lv_obj_t *button = ui_common_card(screen, x, 208, 70, 72, selected, true);
+    lv_obj_t *button = ui_common_card(screen, x, 208, 70, 72, false, true);
+    lv_obj_t *marker = lv_obj_get_child(button, 0);
+    if (marker) lv_obj_add_flag(marker, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_style_bg_color(button, lv_color_hex(selected ? KP_CARD_ALT : KP_CARD), 0);
+    lv_obj_set_style_border_color(button, lv_color_hex(selected ? KP_THEME : 0x263951), 0);
+    lv_obj_set_style_border_width(button, selected ? 2 : 1, 0);
     lv_obj_t *image = ui_home_menu_icon_create(button, icon, 15, 5);
-    if (image && !selected) lv_obj_set_style_opa(image, LV_OPA_70, 0);
-    ui_common_label_small(button, text, 14, 48, 48, LV_TEXT_ALIGN_CENTER);
+    if (image && !selected) lv_obj_set_style_opa(image, LV_OPA_60, 0);
+    lv_obj_t *label = ui_common_label_small(button, text, 7, 48, 56, LV_TEXT_ALIGN_CENTER);
+    lv_obj_set_style_text_color(label, lv_color_hex(selected ? KP_TEXT : KP_MUTED_LIGHT), 0);
 }
 lv_obj_t *ui_home_build(const app_model_snapshot_t *model, int selected)
 {
@@ -25,38 +48,29 @@ lv_obj_t *ui_home_build(const app_model_snapshot_t *model, int selected)
     lv_obj_set_style_pad_all(screen, 0, 0); lv_obj_set_style_border_width(screen, 0, 0);
     lv_obj_t *band = lv_obj_create(screen); lv_obj_set_pos(band, 0, 118); lv_obj_set_size(band, 240, 90);
     lv_obj_set_style_bg_color(band, lv_color_hex(KP_BG), 0); lv_obj_set_style_bg_opa(band, LV_OPA_COVER, 0); lv_obj_set_style_border_width(band, 0, 0); lv_obj_set_style_radius(band, 0, 0);
-    lv_obj_t *avatar = ui_avatar_create(screen, 72, 0);
+    lv_obj_t *avatar = ui_avatar_create(screen, 106, 1);
     const char *name = CONFIG_KP_CHILD_NAME;
-    const char *role = CONFIG_KP_CHILD_ROLE;
-    ui_common_label(screen, name, 6, 32, 66, LV_TEXT_ALIGN_LEFT, true);
-    lv_obj_t *role_label = ui_common_label_small(screen, role, 8, 62, 52, LV_TEXT_ALIGN_LEFT);
-    lv_obj_set_style_text_color(role_label, lv_color_hex(KP_MUTED), 0);
+    /* Home-only wordmark: the configured child name is the logo. */
+    lv_obj_t *logo = ui_common_label(screen, name, 8, 39, 96, LV_TEXT_ALIGN_LEFT, true);
+    lv_obj_set_height(logo, 30);
+    lv_obj_set_style_text_color(logo, lv_color_hex(KP_THEME), 0);
+    lv_obj_set_style_text_letter_space(logo, 1, 0);
+    lv_obj_t *role_badge = pill(screen, 8, 76, 62, 24, 0x172B35);
+    pill_label(role_badge, CONFIG_KP_CHILD_ROLE, UI_FONT_SMALL, KP_MUTED_LIGHT, 1);
     lv_obj_t *balance = pill(screen, 8, 154, 108, 44, 0x3A3017);
-    lv_obj_t *bt = ui_common_label_small(balance, "积分余额", 0, 4, 108, LV_TEXT_ALIGN_CENTER);
-    lv_obj_set_height(bt, 14);
-    lv_obj_set_style_text_color(bt, lv_color_hex(0xD5BC70), 0);
+    pill_label(balance, "积分余额", UI_FONT_SMALL, 0xD5BC70, -9);
     char value[24]; snprintf(value, sizeof(value), model->balance_valid ? "%ld 分" : "-- 分", (long)model->balance);
-    lv_obj_t *bv = ui_common_label(balance, value, 0, 19, 108, LV_TEXT_ALIGN_CENTER, true);
-    lv_obj_set_height(bv, 22);
-    lv_obj_set_style_text_color(bv, lv_color_hex(KP_YELLOW), 0);
+    pill_label(balance, value, UI_FONT_TITLE, KP_YELLOW, 9);
     int done = 0; for (size_t i = 0; i < model->task_count; i++) if (model->tasks[i].completed_today) done++;
     lv_obj_t *progress = pill(screen, 124, 154, 108, 44, 0x172B35);
-    lv_obj_t *pt = ui_common_label_small(progress, "今日进度", 0, 4, 108, LV_TEXT_ALIGN_CENTER);
-    lv_obj_set_height(pt, 14);
+    pill_label(progress, "今日进度", UI_FONT_SMALL, KP_TEXT, -9);
     char pv[16]; snprintf(pv, sizeof(pv), "%d/%u", done, (unsigned)model->task_count);
-    lv_obj_t *progress_value = ui_common_label(progress, pv, 0, 19, 108, LV_TEXT_ALIGN_CENTER, true);
-    lv_obj_set_height(progress_value, 22);
-    lv_obj_set_style_text_color(progress_value, lv_color_hex(KP_GREEN), 0);
+    pill_label(progress, pv, UI_FONT_TITLE, KP_GREEN, 9);
     entry(screen, 8, selected == 0, UI_PIXEL_ICON_TASK, "今日任务");
     entry(screen, 85, selected == 1, UI_PIXEL_ICON_GIFT, "兑换奖品");
     entry(screen, 162, selected == 2, UI_PIXEL_ICON_GAME, "互动游戏");
-    lv_obj_t *hint = ui_common_label_small(screen, model->pending_type != APP_PENDING_NONE ? "请稍候..." : "上下选择 中键确认 长按上键主页", 5, 296, 230, LV_TEXT_ALIGN_CENTER);
-    lv_obj_set_style_text_color(hint, lv_color_hex(KP_MUTED), 0);
+    ui_common_footer(screen, "上下选择 中键确认 长按上键主页", model->pending_type != APP_PENDING_NONE);
     lv_obj_t *statusbar = ui_statusbar_create(screen, model);
-    char device_text[32];
-    snprintf(device_text, sizeof(device_text), "%s设备", CONFIG_KP_CHILD_ROLE);
-    lv_obj_t *device = ui_common_label_small(statusbar, device_text, 4, 1, 55, LV_TEXT_ALIGN_LEFT);
-    lv_obj_set_style_text_color(device, lv_color_hex(KP_MUTED_LIGHT), 0);
     lv_obj_move_foreground(avatar);
     ui_statusbar_home_foreground(statusbar);
     return screen;

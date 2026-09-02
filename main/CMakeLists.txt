@@ -40,6 +40,9 @@ idf_component_register(
          "fonts/lv_font_noto_sc_14.c"
          "fonts/lv_font_noto_sc_18.c"
          "fonts/lv_font_noto_sc_24.c"
+    EMBED_FILES "assets/rps_official/rock_54x72.rgb565"
+                "assets/rps_official/scissors_54x72.rgb565"
+                "assets/rps_official/paper_54x72.rgb565"
     INCLUDE_DIRS "." "ui" "sound" "fonts" "assets" "interaction"
     REQUIRES bsp esp_driver_usb_serial_jtag esp_event esp_hw_support esp_netif esp_timer esp_wifi json mqtt nvs_flash vfs
 )

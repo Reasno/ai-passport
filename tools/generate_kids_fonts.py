@@ -18,10 +18,11 @@ FONT_FILES = {
     24: out / "lv_font_noto_sc_24.c",
 }
 SOURCE_FILES = [
-    *sorted((root / "main" / "ui").glob("*.c")),
-    root / "main" / "interaction" / "game_service.c",
-    root / "main" / "mqtt_service.c",
+    path for path in sorted((root / "main").rglob("*"))
+    if path.suffix in {".c", ".h"} and "fonts" not in path.parts
 ]
+LOCAL_CONFIG_FILES = [root / "sdkconfig.defaults", root / "sdkconfig"]
+EXPLICIT_CHILD_NAME_CHARS = "".join(chr(codepoint) for codepoint in (0x8C37, 0x6C81, 0x56ED, 0x8431))
 ASCII_PUNCT = "".join(chr(i) for i in range(0x20, 0x7F)) + "，。！？：；、（）《》“”‘’￥"
 FORBIDDEN_UI_SYMBOLS = "↑↓✓○★·…—　"
 SMALL_TEXT = """
@@ -65,20 +66,29 @@ def static_source_chars():
     chars = []
     for path in SOURCE_FILES:
         text = path.read_text(encoding="utf-8")
-        if "LV_FONT_MONTSERRAT" in text:
+        if path.parent.name == "ui" and "LV_FONT_MONTSERRAT" in text:
             raise SystemExit(f"Chinese UI must not use Montserrat: {path}")
-        forbidden = sorted(set(text) & set(FORBIDDEN_UI_SYMBOLS))
-        if forbidden:
-            raise SystemExit(f"unverified Unicode UI symbol(s) in {path}: {''.join(forbidden)}")
         for literal in c_string_literals(text):
             try:
                 decoded = bytes(literal, "utf-8").decode("unicode_escape").encode("latin1").decode("utf-8")
             except (UnicodeDecodeError, UnicodeEncodeError):
                 decoded = literal
+            forbidden = sorted(set(decoded) & set(FORBIDDEN_UI_SYMBOLS))
+            if forbidden:
+                raise SystemExit(f"unverified Unicode UI symbol(s) in {path}: {''.join(forbidden)}")
             chars.extend(c for c in decoded if ord(c) >= 0x80)
-    # Kconfig defaults are user-visible on Home even before local overrides.
-    chars.extend("小朋友哥哥妹妹")
-    return unique("".join(chars))
+    # Local identity is intentionally ignored by Git, but it is still rendered on Home.
+    # Scan only the user-visible identity keys so Wi-Fi credentials never enter generated comments.
+    for path in LOCAL_CONFIG_FILES:
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for key in ("KP_CHILD_NAME", "KP_CHILD_ROLE"):
+            match = re.search(rf'^CONFIG_{key}="(.*)"$', text, re.M)
+            if match:
+                chars.extend(c for c in match.group(1) if ord(c) >= 0x80)
+    chars.extend("小朋友哥哥妹妹" + EXPLICIT_CHILD_NAME_CHARS)
+    return "".join(sorted(set(chars)))
 
 
 def parse_generated_cmap(path):
@@ -113,7 +123,7 @@ def required_sets():
     return {
         14: unique(ASCII_PUNCT + SMALL_TEXT + source),
         18: unique(ASCII_PUNCT + gb2312_level1() + source),
-        24: unique(ASCII_PUNCT + TITLE_TEXT),
+        24: unique(ASCII_PUNCT + TITLE_TEXT + source + EXPLICIT_CHILD_NAME_CHARS),
     }
 
 
