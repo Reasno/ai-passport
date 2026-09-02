@@ -186,7 +186,7 @@ static void handle_short_key(bsp_btn_t key)
             else game_service_move_choice(key == BSP_BTN_UP ? -1 : 1);
         }
         else if (game->state == GAME_STATE_RESULT) {
-            if (key == BSP_BTN_DOWN) { game_service_cancel(); go(PAGE_HOME, 0); }
+            if (key == BSP_BTN_UP) { game_service_cancel(); go(PAGE_HOME, 0); }
             else if (key == BSP_BTN_OK) game_service_invite_rps();
         }
         else if (game->state == GAME_STATE_IDLE && key == BSP_BTN_OK) go(PAGE_GAMES, 1);

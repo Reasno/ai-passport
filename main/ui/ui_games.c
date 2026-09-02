@@ -129,7 +129,7 @@ lv_obj_t *ui_find_build(const app_model_snapshot_t *model, const game_snapshot_t
     bool ptt = ptt_service_available();
     lv_obj_t *p = ui_common_label_small(screen, ptt ? (ptt_service_is_transmitting() ? "正在说话 松开B2结束" : "长按B2对讲") : "对讲不可用", 12, 240, 216, LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_text_color(p, lv_color_hex(ptt ? KP_GREEN : KP_MUTED), 0);
-    ui_common_footer(screen, waiting ? "等待对方回应" : "B1 B2选择  B3确认  长按B1主页", false);
+    ui_common_footer(screen, waiting ? "等待对方回应  按B3取消" : "B1 B2选择  B3确认  长按B1主页", false);
     return screen;
 }
 
@@ -151,8 +151,8 @@ lv_obj_t *ui_rps_build(const app_model_snapshot_t *model, const game_snapshot_t 
         ui_common_label(screen, "B2拒绝 B3接受", 20, 194, 200, LV_TEXT_ALIGN_CENTER, false);
         footer = "B2拒绝  B3接受  长按B1主页";
     } else if (game->state == GAME_STATE_RESULT) {
-        ui_common_label(screen, "B2返回主页  B3再来一局", 12, 206, 216, LV_TEXT_ALIGN_CENTER, false);
-        footer = "B2返回 B3再来一局";
+        ui_common_label(screen, "B1主页  B3再来一局", 12, 206, 216, LV_TEXT_ALIGN_CENTER, false);
+        footer = "B1主页 B3再来一局";
     } else if (game->state == GAME_STATE_COUNTDOWN) {
         /* The centered status already says 即将开始; deliberately show no seconds. */
     } else {

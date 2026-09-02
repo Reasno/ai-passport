@@ -18,6 +18,11 @@
 
 - 删除位于 `0x700000` 的旧 app/test 分区，以及相关的 bootloader、校验和
   文档要求；固定的 `cardid` 保护分区及其 CI 校验保持不变。
+
+- 找兄弟姐妹的等待页 footer 补充 B3 取消提示；石头剪刀布结果页统一使用全局 B1 返回主页，并保留 B3 再来一局。
+- 将小程序 BLE 安装兼容提升为二创模板强制契约：固定保护 `cardid`/Recovery 分区，
+  保留上键持续 5 秒进入 Recovery 的 bootloader hook，并在 CI 强制校验合并镜像结构、
+  分区表 MD5/范围、3 MB 应用上限和保护分区数据不入包。
 - 规定多应用发布的 Release 标题约定：tag 按 `v<版本>-<应用名>`（如 `v0.1.0-voice-keychain`）命名，让 Release 标题同时带版本与应用名；发布成功后核对标题，保证一眼扫 Release 列表就能区分是哪个应用。
 - 新增发布后收尾流程：`issue-suggestions` skill 用于把用户反馈作为 issue 提交到上游项目；`experience-pr` skill 用于把可复用的开发经验作为文档 PR 提交；新增 `docs/experiences/` 目录保存单条经验文件；并配套 `project-completion`、`file-issues` 与经验索引文档。
 - 精简仓库根目录：将 GitHub 可识别的社区治理文档迁入 `.github/`，将变更记录迁入 `docs/`，同步全部引用，并在仓库检查中加入根目录文档白名单。

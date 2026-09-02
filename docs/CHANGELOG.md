@@ -21,6 +21,12 @@
 - Removed the obsolete app/test partition at `0x700000` and its related
   bootloader, validation, and documentation requirements. The fixed protected
   `cardid` partition and its CI checks remain unchanged.
+
+- Clarified the find-sibling waiting footer with the B3 cancel action, and aligned the rock-paper-scissors result screen with the global B1 home action while keeping B3 rematch.
+- Made mini-program BLE install compatibility a template-level invariant: fixed
+  protected `cardid`/Recovery partitions, retained the five-second UP-key
+  Recovery boot hook, and added CI validation for merged-image structure,
+  partition MD5/ranges, the 3 MB app limit, and protected payload exclusion.
 - Documented a release-title convention for multi-app releases: name tags as `v<version>-<app-name>` (e.g. `v0.1.0-voice-keychain`) so the release title carries the version and the app, and confirm the title after the release is published so a release list is scannable by app.
 - Added a post-release follow-up workflow: an `issue-suggestions` skill for filing user feedback as issues against the upstream project, an `experience-pr` skill for submitting reusable development experience as a documentation PR, a `docs/experiences/` directory for per-entry experience files, and supporting `project-completion`, `file-issues`, and experience-index documents.
 - Simplified the tracked repository root: moved GitHub-recognized community documents into `.github/`, moved the changelog into `docs/`, updated every reference, and added a root-document allowlist to repository checks.
