@@ -129,7 +129,7 @@ lv_obj_t *ui_find_build(const app_model_snapshot_t *model, const game_snapshot_t
     bool ptt = ptt_service_available();
     lv_obj_t *p = ui_common_label_small(screen, ptt ? (ptt_service_is_transmitting() ? "正在说话 松开B2结束" : "长按B2对讲") : "对讲不可用", 12, 240, 216, LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_text_color(p, lv_color_hex(ptt ? KP_GREEN : KP_MUTED), 0);
-    ui_common_footer(screen, waiting ? "等待对方回应  按B3取消" : "B1 B2选择  B3确认  长按B1主页", false);
+    ui_common_footer(screen, waiting ? "等待对方回应  按B3取消" : "长按B1主页  长按B2对讲  B3响铃", false);
     return screen;
 }
 
@@ -142,6 +142,7 @@ lv_obj_t *ui_rps_build(const app_model_snapshot_t *model, const game_snapshot_t 
     rps_choice_card(screen, 166, &s_rps_paper, "布", shown == RPS_PAPER);
     ui_common_label(screen, game->status, 12, 153, 216, LV_TEXT_ALIGN_CENTER, false);
     const char *footer = "长按B1主页";
+    bool show_footer = true;
     if (game->state == GAME_STATE_WAITING_CHOICE) {
         ui_common_label_small(screen, game->local_choice == RPS_NONE ? "选择后按确认出拳" : "已锁定出拳，等待对方", 6, 194, 228, LV_TEXT_ALIGN_CENTER);
         footer = game->local_choice == RPS_NONE
@@ -151,8 +152,7 @@ lv_obj_t *ui_rps_build(const app_model_snapshot_t *model, const game_snapshot_t 
         ui_common_label(screen, "B2拒绝 B3接受", 20, 194, 200, LV_TEXT_ALIGN_CENTER, false);
         footer = "B2拒绝  B3接受  长按B1主页";
     } else if (game->state == GAME_STATE_RESULT) {
-        ui_common_label(screen, "B1主页  B3再来一局", 12, 206, 216, LV_TEXT_ALIGN_CENTER, false);
-        footer = "B1主页 B3再来一局";
+        show_footer = false;
     } else if (game->state == GAME_STATE_COUNTDOWN) {
         /* The centered status already says 即将开始; deliberately show no seconds. */
     } else {
@@ -160,6 +160,6 @@ lv_obj_t *ui_rps_build(const app_model_snapshot_t *model, const game_snapshot_t 
         snprintf(left, sizeof(left), "剩余 %lu 秒", (unsigned long)game->seconds_left);
         ui_common_label(screen, left, 20, 194, 200, LV_TEXT_ALIGN_CENTER, false);
     }
-    ui_common_footer(screen, footer, false);
+    if (show_footer) ui_common_footer(screen, footer, false);
     return screen;
 }
