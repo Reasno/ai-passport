@@ -46,15 +46,15 @@ config KP_CHILD_ROLE
 
 config KIDS_DEVICE_ID
     string "本机互动设备 ID"
-    default "brother_device" if KIDS_ACTOR_BROTHER
-    default "sister_device" if KIDS_ACTOR_SISTER
+    default "ai_passport_brother" if KIDS_ACTOR_BROTHER
+    default "ai_passport_sister" if KIDS_ACTOR_SISTER
     help
-        Find MQTT topic 中标识本机；同一家庭内必须唯一。
+        本机身份，服务端按 ai_passport_<child_id> 校验，必须保持该命名。
 
 config KIDS_PEER_DEVICE_ID
     string "伙伴互动设备 ID"
-    default "sister_device" if KIDS_ACTOR_BROTHER
-    default "brother_device" if KIDS_ACTOR_SISTER
+    default "ai_passport_sister" if KIDS_ACTOR_BROTHER
+    default "ai_passport_brother" if KIDS_ACTOR_SISTER
     help
         Find 按键响铃的目标设备 ID。
 

@@ -31,7 +31,7 @@ lv_obj_t *ui_lottery_build(const app_model_snapshot_t *model, int rotation, bool
         lv_obj_set_style_text_color(title, lv_color_hex(KP_YELLOW), 0);
 
         ui_common_label(screen,
-                        model->lottery_points_delta ? "奖励已自动入账" : "请找爸爸妈妈兑奖",
+                        lottery_result_hint(model->lottery_prize_id, model->lottery_points_delta),
                         10, 142, 220, LV_TEXT_ALIGN_CENTER, false);
         ui_common_footer(screen, "B1 B2选择  B3确认  长按B1主页", false);
         return screen;
@@ -60,10 +60,12 @@ lv_obj_t *ui_lottery_build(const app_model_snapshot_t *model, int rotation, bool
 void ui_lottery_start_spin(int target_index)
 {
     if (!s_wheel) return;
-    if (target_index < 0 || target_index > 6) target_index = 0;
+    if (target_index < 0 || target_index >= LOTTERY_PRIZE_COUNT) target_index = 0;
 
-    /* Seven full turns, then put the selected sector's centre under the top pointer. */
-    int32_t final_rotation = 7 * 3600 - (target_index * 3600 + 3) / 7;
+    /* Sector i sits i*(360/7) degrees clockwise from the top pointer, so the wheel has to
+     * come back counter-clockwise by the same amount after seven full turns. */
+    int32_t offset = (target_index * 3600 + LOTTERY_PRIZE_COUNT / 2) / LOTTERY_PRIZE_COUNT;
+    int32_t final_rotation = 7 * 3600 - offset;
     lv_anim_t anim;
     lv_anim_init(&anim);
     lv_anim_set_var(&anim, s_wheel);

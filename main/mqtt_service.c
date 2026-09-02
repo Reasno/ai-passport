@@ -11,7 +11,8 @@
 
 #define TOPIC_STATE "kids_points/state/shared"
 #define TOPIC_REWARDS "kids_points/rewards"
-#define TOPIC_RESULT "kids_points/action/result/+"
+#define TOPIC_RESULT_PREFIX "kids_points/action/result/"
+#define TOPIC_RESULT TOPIC_RESULT_PREFIX "+"
 #define TOPIC_ACTION_ERROR "kids_points/action/error"
 #define TOPIC_LOTTERY_SHARED "kids_points/lottery_result/shared"
 #define TOPIC_COMPLETE_V3 "kids_points/action/complete"
@@ -243,6 +244,30 @@ static esp_err_t parse_reward_item(const char *key, cJSON *root)
     return ESP_ERR_NOT_FOUND;
 }
 
+static const char *friendly_error(const char *code)
+{
+    static const struct { const char *code; const char *text; } MAP[] = {
+        {"insufficient_balance", "积分不够啦"},
+        {"reward_disabled", "这个奖品停用了"},
+        {"reward_not_found", "找不到这个奖品"},
+        {"reward_not_redeemable", "这个奖品不能直接兑换"},
+        {"empty_lottery_pool", "奖池空啦，找爸爸妈妈"},
+        {"task_not_found", "找不到这个任务"},
+        {"task_disabled", "这个任务停用了"},
+        {"task_not_scheduled", "今天没有这个任务"},
+        {"child_not_allowed", "这不是你的任务"},
+        {"idempotency_conflict", "重复请求，请稍后再试"},
+        {"device_identity_mismatch", "设备身份不匹配\n请找爸爸妈妈"},
+        {"invalid_payload", "请求格式有误\n请找爸爸妈妈"},
+        {"invalid_child_id", "设备绑定有误\n请找爸爸妈妈"},
+    };
+    if (!code) return NULL;
+    for (size_t i = 0; i < sizeof(MAP) / sizeof(MAP[0]); i++) {
+        if (strcmp(code, MAP[i].code) == 0) return MAP[i].text;
+    }
+    return NULL;
+}
+
 static void handle_result(const char *json, size_t len)
 {
     cJSON *root = cJSON_ParseWithLength(json, len);
@@ -266,7 +291,9 @@ static void handle_result(const char *json, size_t len)
     if (cJSON_IsNumber(balance)) app_model_apply_action_balance(balance->valueint, true);
     const char *message = json_string(root, "message");
     if (!message) message = json_string(root, "error");
-    if (!message) message = json_string(root, "error_code");
+    const char *code = json_string(root, "error_code");
+    if (!message) message = friendly_error(code);
+    if (!message) message = code;
     app_event_t event = {.type = APP_EVT_ACTION_RESULT, .ok = ok, .value = pending};
     strlcpy(event.text, message ? message : (ok ? "操作成功" : "操作失败，请重试"), sizeof(event.text));
     bool wait_lottery = ok && pending == APP_PENDING_REDEEM && strcmp(item_id, "lottery_ticket") == 0;
@@ -280,6 +307,7 @@ static void handle_result(const char *json, size_t len)
 
 static void handle_lottery(void)
 {
+    ESP_LOGI(TAG, "lottery payload topic=%s json=%.*s", s_rx_topic, (int)s_rx_total, s_rx_data);
     cJSON *root = cJSON_ParseWithLength(s_rx_data, s_rx_total);
     if (!root) { post_error("抽奖结果格式错误"); return; }
     const char *actor = json_string(root, "actor_child_id");
@@ -302,7 +330,9 @@ static void handle_lottery(void)
     cJSON_Delete(root);
     esp_err_t err = app_model_parse_lottery(s_rx_data, s_rx_total);
     if (err == ESP_OK) {
-        ESP_LOGI(TAG, "lottery result protocol=%s key=%s", child_topic ? "v3-child" : "legacy-shared", key ? key : "(none)");
+        app_model_snapshot(&s_mqtt_event_model);
+        ESP_LOGI(TAG, "lottery result protocol=%s key=%s prize=%s", child_topic ? "v3-child" : "legacy-shared",
+                 key ? key : "(none)", s_mqtt_event_model.lottery_prize_id);
         app_event_post(&(app_event_t){.type = APP_EVT_LOTTERY_RESULT, .ok = true}, 0);
     } else {
         ESP_LOGW(TAG, "抽奖结果解析失败: %s", esp_err_to_name(err));
@@ -326,7 +356,7 @@ static void handle_payload(void)
         cJSON_Delete(root);
         return;
     }
-    if (strncmp(s_rx_topic, "kids_points/action/result/", 27) == 0 || topic_is(TOPIC_ACTION_ERROR)) {
+    if (strncmp(s_rx_topic, TOPIC_RESULT_PREFIX, strlen(TOPIC_RESULT_PREFIX)) == 0 || topic_is(TOPIC_ACTION_ERROR)) {
         handle_result(s_rx_data, s_rx_total); return;
     }
     if (topic_is(TOPIC_LOTTERY_SHARED) || topic_is(s_lottery_child_topic)) { handle_lottery(); return; }
