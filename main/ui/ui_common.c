@@ -149,7 +149,7 @@ lv_obj_t *ui_common_card(lv_obj_t *parent, int x, int y, int w, int h, bool sele
     lv_obj_set_size(bar, 3, (h * 60) / 100);
     lv_obj_align(bar, LV_ALIGN_LEFT_MID, 4, 0);
     lv_obj_set_style_radius(bar, 2, 0);
-    lv_obj_set_style_bg_color(bar, lv_color_hex(0x4488FF), 0);
+    lv_obj_set_style_bg_color(bar, lv_color_hex(KP_THEME), 0);
     ui_common_card_set_selected(obj, selected);
     return obj;
 }
