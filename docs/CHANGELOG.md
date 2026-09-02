@@ -6,6 +6,7 @@
 
 ## Unreleased
 
+- Clarified the find-sibling waiting footer with the B3 cancel action, and aligned the rock-paper-scissors result screen with the global B1 home action while keeping B3 rematch.
 - Made mini-program BLE install compatibility a template-level invariant: fixed
   protected `cardid`/Recovery partitions, retained the five-second UP-key
   Recovery boot hook, and added CI validation for merged-image structure,

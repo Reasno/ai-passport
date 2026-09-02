@@ -6,6 +6,7 @@
 
 ## Unreleased
 
+- 找兄弟姐妹的等待页 footer 补充 B3 取消提示；石头剪刀布结果页统一使用全局 B1 返回主页，并保留 B3 再来一局。
 - 将小程序 BLE 安装兼容提升为二创模板强制契约：固定保护 `cardid`/Recovery 分区，
   保留上键持续 5 秒进入 Recovery 的 bootloader hook，并在 CI 强制校验合并镜像结构、
   分区表 MD5/范围、3 MB 应用上限和保护分区数据不入包。
