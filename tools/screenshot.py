@@ -105,6 +105,7 @@ def main():
     parser.add_argument("--output", type=Path, default=Path("screenshot.png"))
     parser.add_argument("--timeout", type=float, default=15.0)
     parser.add_argument("--page", choices=("HOME", "TASKS", "REDEEM", "LOTTERY", "GAMES", "FIND", "RPS",
+                                 "BUZZER", "BUZZER_ARMED", "BUZZER_GO", "BUZZER_RESULT",
                                  "LOTTERY_SPIN", "LOTTERY_RESULT"),
                         help="switch to a side-effect-free debug preview before capture")
     parser.add_argument("--settle-ms", type=int, default=300, help="delay after PAGE acknowledgement")

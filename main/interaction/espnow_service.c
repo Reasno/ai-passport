@@ -1,4 +1,5 @@
 #include "espnow_service.h"
+#include "buzzer_game_service.h"
 #include "find_service.h"
 #include "game_service.h"
 #include "ptt_service.h"
@@ -72,7 +73,10 @@ static void rx_task(void *arg)
             find_service_on_espnow(p->type == ESPNOW_MSG_FIND_RING, espnow_find_ts(p));
             continue;
         }
-        game_service_on_packet(event.src, p, event.rssi);
+        if (buzzer_game_service_owns_packet(p->type))
+            buzzer_game_service_on_packet(event.src, p);
+        else
+            game_service_on_packet(event.src, p, event.rssi);
     }
 }
 static void load_peer(void)
@@ -127,6 +131,12 @@ esp_err_t espnow_service_send(espnow_msg_type_t type, uint16_t session, uint16_t
                               uint8_t choice, int8_t value, bool broadcast)
 {
     return send_packet(type, session, sequence, choice, value, 0, broadcast);
+}
+esp_err_t espnow_service_send_data(espnow_msg_type_t type, uint16_t session,
+                                   uint16_t sequence, uint32_t data)
+{
+    return send_packet(type, session, sequence, (uint8_t)data, (int8_t)(data >> 8),
+                       (uint16_t)(data >> 16), false);
 }
 /* Find ring/ack always go straight to the paired sibling; the 32-bit ts is split so both
  * transports (ESP-NOW here, MQTT elsewhere) advertise the same idempotency token. */

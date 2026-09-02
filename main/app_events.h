@@ -31,6 +31,10 @@ typedef enum {
     APP_DEBUG_PAGE_GAMES,
     APP_DEBUG_PAGE_FIND,
     APP_DEBUG_PAGE_RPS,
+    APP_DEBUG_PAGE_BUZZER,
+    APP_DEBUG_PAGE_BUZZER_ARMED,
+    APP_DEBUG_PAGE_BUZZER_GO,
+    APP_DEBUG_PAGE_BUZZER_RESULT,
     APP_DEBUG_PAGE_LOTTERY_SPIN,
     APP_DEBUG_PAGE_LOTTERY_RESULT,
     APP_DEBUG_PAGE_COUNT,
@@ -43,6 +47,7 @@ typedef struct {
     bsp_btn_ev_t button_event;
     bool ok;
     int32_t value;
+    int64_t timestamp_ms;
     char text[128];
 } app_event_t;
 

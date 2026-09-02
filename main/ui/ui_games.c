@@ -55,13 +55,13 @@ static void rps_choice_card(lv_obj_t *screen, int x, const lv_image_dsc_t *image
 static void game_card(lv_obj_t *screen, int y, bool selected, bool enabled, ui_pixel_icon_t icon,
                       const char *title, const char *detail)
 {
-    lv_obj_t *card = ui_common_card(screen, 12, y, 216, 66, selected, enabled);
+    lv_obj_t *card = ui_common_card(screen, 12, y, 216, 52, selected, enabled);
     lv_obj_t *image = icon == UI_PIXEL_ICON_RADAR
                           ? ui_radar_icon_create(card, 0, 0, enabled ? KP_THEME : KP_MUTED, 3)
                           : ui_pixel_icon_create(card, icon, 0, 0, enabled ? KP_THEME : KP_MUTED, 3);
     if (image) lv_obj_align(image, LV_ALIGN_LEFT_MID, 14, 0);
-    ui_common_label(card, title, 56, 7, 148, LV_TEXT_ALIGN_LEFT, false);
-    lv_obj_t *d = ui_common_label_small(card, detail, 56, 38, 148, LV_TEXT_ALIGN_LEFT);
+    ui_common_label(card, title, 56, 2, 148, LV_TEXT_ALIGN_LEFT, false);
+    lv_obj_t *d = ui_common_label_small(card, detail, 56, 28, 148, LV_TEXT_ALIGN_LEFT);
     lv_obj_set_style_text_color(d, lv_color_hex(enabled ? KP_MUTED_LIGHT : KP_MUTED), 0);
 }
 
@@ -74,12 +74,14 @@ lv_obj_t *ui_games_build(const app_model_snapshot_t *model, const game_snapshot_
     bool find_ready = game->paired || model->mqtt_online;
     const char *find_detail = game->paired ? "响铃和近距离信号"
                               : model->mqtt_online ? "仅WiFi响铃 无测距" : "请先完成配对";
-    game_card(screen, 52, selected == 0, game_service_heap_allows_radar() && find_ready,
+    game_card(screen, 47, selected == 0, game_service_heap_allows_radar() && find_ready,
               UI_PIXEL_ICON_RADAR, "找" KP_PEER_LABEL, find_detail);
-    game_card(screen, 126, selected == 1, game_service_heap_allows_rps() && game->paired,
+    game_card(screen, 105, selected == 1, game_service_heap_allows_rps() && game->paired,
               UI_PIXEL_ICON_RPS, "石头剪刀布", game->paired ? "纯娱乐 不增减积分" : "请先完成配对");
+    game_card(screen, 163, selected == 2, game_service_heap_allows_rps() && game->paired,
+              UI_PIXEL_ICON_RPS, "三灯抢答", game->paired ? "B3 抢答 纯娱乐" : "请先完成配对");
     char heap[48]; snprintf(heap, sizeof(heap), "可用内存 %lu KB", (unsigned long)(esp_get_free_heap_size() / 1024));
-    lv_obj_t *h = ui_common_label_small(screen, heap, 12, 211, 216, LV_TEXT_ALIGN_CENTER);
+    lv_obj_t *h = ui_common_label_small(screen, heap, 12, 222, 216, LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_text_color(h, lv_color_hex(KP_MUTED), 0);
     if (game->state == GAME_STATE_PAIRING) ui_common_message(screen, game->status, false);
     ui_common_footer(screen, "B1 B2选择  B3确认  长按B1主页", false);
@@ -159,6 +161,63 @@ lv_obj_t *ui_rps_build(const app_model_snapshot_t *model, const game_snapshot_t 
         snprintf(left, sizeof(left), "剩余 %lu 秒", (unsigned long)game->seconds_left);
         ui_common_label(screen, left, 20, 194, 200, LV_TEXT_ALIGN_CENTER, false);
     }
+    ui_common_footer(screen, footer, false);
+    return screen;
+}
+
+static lv_obj_t *buzzer_light(lv_obj_t *parent, int x, bool on)
+{
+    lv_obj_t *light = lv_obj_create(parent);
+    lv_obj_set_pos(light, x, 18);
+    lv_obj_set_size(light, 48, 48);
+    lv_obj_set_style_radius(light, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(light, lv_color_hex(on ? 0xFF334D : 0x364254), 0);
+    lv_obj_set_style_border_color(light, lv_color_hex(on ? 0xFF7A8C : 0x526075), 0);
+    lv_obj_set_style_border_width(light, 3, 0);
+    lv_obj_clear_flag(light, LV_OBJ_FLAG_SCROLLABLE);
+    return light;
+}
+
+lv_obj_t *ui_buzzer_build(const app_model_snapshot_t *model, const buzzer_game_snapshot_t *game)
+{
+    lv_obj_t *screen = ui_common_screen("三灯抢答", model);
+    lv_obj_t *card = lv_obj_create(screen);
+    lv_obj_set_pos(card, 12, 38);
+    lv_obj_set_size(card, 216, 92);
+    lv_obj_set_style_radius(card, 14, 0);
+    lv_obj_set_style_bg_color(card, lv_color_hex(KP_CARD), 0);
+    lv_obj_set_style_border_color(card, lv_color_hex(KP_THEME), 0);
+    lv_obj_set_style_border_width(card, 1, 0);
+    lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
+    for (int i = 0; i < 3; ++i) buzzer_light(card, 18 + i * 62, i < game->lights_on);
+
+    const char *role = game->is_host ? "HOST" : "CLIENT";
+    if (game->state == BUZZER_STATE_IDLE) role = "READY";
+    lv_obj_t *role_label = ui_common_label_small(screen, role, 12, 136, 216, LV_TEXT_ALIGN_CENTER);
+    lv_obj_set_style_text_color(role_label, lv_color_hex(KP_THEME), 0);
+    ui_common_label(screen, game->status, 12, 158, 216, LV_TEXT_ALIGN_CENTER, false);
+
+    const char *hint = "等待邀请";
+    const char *footer = "长按B1主页";
+    if (game->state == BUZZER_STATE_INVITE_RECEIVED) {
+        hint = "B2 拒绝  B3 接受";
+        footer = "B2拒绝  B3接受  长按B1主页";
+    } else if (game->state == BUZZER_STATE_ARMED) {
+        hint = "红灯全灭前按 B3 会判负";
+        footer = "只用B3抢答  长按B1主页";
+    } else if (game->state == BUZZER_STATE_GO) {
+        hint = "现在按 B3！";
+        footer = "B3抢答  长按B1主页";
+    } else if (game->state == BUZZER_STATE_RESULT) {
+        hint = "主机已按同步时间裁决";
+        footer = "B3再来一局  长按B1主页";
+    } else if (game->state == BUZZER_STATE_SYNCING) {
+        hint = "NTP-like 多次采样中";
+    } else if (game->state == BUZZER_STATE_INVITE_SENT) {
+        hint = "等待对方接受";
+    }
+    lv_obj_t *h = ui_common_label_small(screen, hint, 12, 205, 216, LV_TEXT_ALIGN_CENTER);
+    lv_obj_set_style_text_color(h, lv_color_hex(KP_MUTED_LIGHT), 0);
     ui_common_footer(screen, footer, false);
     return screen;
 }

@@ -102,6 +102,7 @@ static bool post_page_command(const char *name)
 {
     static const char *const names[APP_DEBUG_PAGE_COUNT] = {
         "HOME", "TASKS", "REDEEM", "LOTTERY", "GAMES", "FIND", "RPS",
+        "BUZZER", "BUZZER_ARMED", "BUZZER_GO", "BUZZER_RESULT",
         "LOTTERY_SPIN", "LOTTERY_RESULT",
     };
     for (int i = 0; i < APP_DEBUG_PAGE_COUNT; i++) {
