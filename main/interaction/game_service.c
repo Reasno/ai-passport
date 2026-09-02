@@ -102,7 +102,7 @@ void game_service_invite_rps(void)
 {
     if (!s_lock || !game_service_heap_allows_rps()) return;
     xSemaphoreTake(s_lock, portMAX_DELAY);
-    if (!s_game.paired || s_game.state != GAME_STATE_IDLE) { xSemaphoreGive(s_lock); return; }
+    if (!s_game.paired || (s_game.state != GAME_STATE_IDLE && s_game.state != GAME_STATE_RESULT)) { xSemaphoreGive(s_lock); return; }
     s_game.session = (uint16_t)esp_random(); s_game.state = GAME_STATE_INVITE_SENT;
     s_game.local_choice = s_game.remote_choice = RPS_NONE; s_game.cursor_choice = RPS_ROCK;
     s_game.result = 0; s_choice_acked = false; s_invite_receiver = false;
@@ -209,7 +209,8 @@ void game_service_on_packet(const uint8_t src[6], const espnow_game_packet_t *p,
                 changed = true;
             }
         }
-        else if (p->type == ESPNOW_MSG_RPS_INVITE && s_game.state == GAME_STATE_IDLE) {
+        else if (p->type == ESPNOW_MSG_RPS_INVITE &&
+                 (s_game.state == GAME_STATE_IDLE || s_game.state == GAME_STATE_RESULT)) {
             s_game.session = p->session; s_game.state = GAME_STATE_INVITE_RECEIVED;
             s_game.local_choice = s_game.remote_choice = RPS_NONE; s_game.cursor_choice = RPS_ROCK;
             s_choice_acked = false; s_invite_receiver = true; status("收到挑战！");
