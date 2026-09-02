@@ -36,5 +36,5 @@ lv_obj_t *ui_redeem_build(const app_model_snapshot_t *model, int selected)
     ui_common_label(screen, balance, 20, 212, 200, LV_TEXT_ALIGN_CENTER, true);
     if (model->pending_type == APP_PENDING_LOTTERY) ui_common_message(screen, "兑换成功\n正在等待开奖...", false);
     else if (!model->mqtt_online) ui_common_label(screen, "离线状态仅可浏览", 8, 251, 224, LV_TEXT_ALIGN_CENTER, false);
-    ui_common_footer(screen, "上下切换 中键兑换 长按上键主页", model->pending_type != APP_PENDING_NONE); return screen;
+    ui_common_footer(screen, "B1 B2选择  B3确认  长按B1主页", model->pending_type != APP_PENDING_NONE); return screen;
 }

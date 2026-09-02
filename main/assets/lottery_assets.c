@@ -1,4 +1,5 @@
 #include "lottery_assets.h"
+#include "logo_assets.h"
 #include <string.h>
 
 static const char *const REWARD_IDS[] = {
@@ -6,8 +7,8 @@ static const char *const REWARD_IDS[] = {
 };
 
 static const lv_image_dsc_t *const REWARD_IMAGES[] = {
-    &lottery_mcd, &lottery_cash20, &lottery_cash10, &lottery_cash2,
-    &lottery_points10, &lottery_points5, &lottery_points2,
+    &logo_08_mcdonalds_burger, &logo_09_cash_20, &logo_10_cash_10, &logo_11_cash_2,
+    &logo_12_points_10, &logo_13_points_5, &logo_14_points_2,
 };
 
 static const char *const RESULT_TEXTS[] = {

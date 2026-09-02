@@ -1,5 +1,6 @@
 #include "ui_lottery.h"
 #include "lottery_assets.h"
+#include "logo_assets.h"
 #include "ui_common.h"
 #include <stdio.h>
 
@@ -31,12 +32,12 @@ lv_obj_t *ui_lottery_build(const app_model_snapshot_t *model, int rotation, bool
         ui_common_label(screen,
                         model->lottery_points_delta ? "奖励已自动入账" : "请找爸爸妈妈兑奖",
                         10, 142, 220, LV_TEXT_ALIGN_CENTER, false);
-        ui_common_footer(screen, "中键确认返回兑换页", false);
+        ui_common_footer(screen, "B1 B2选择  B3确认  长按B1主页", false);
         return screen;
     }
 
     s_wheel = lv_image_create(screen);
-    lv_image_set_src(s_wheel, &lottery_wheel);
+    lv_image_set_src(s_wheel, &logo_lottery_wheel);
     lv_image_set_pivot(s_wheel, LOTTERY_WHEEL_SIZE / 2, LOTTERY_WHEEL_SIZE / 2);
     lv_image_set_rotation(s_wheel, rotation);
     lv_image_set_antialias(s_wheel, false);
@@ -48,8 +49,8 @@ lv_obj_t *ui_lottery_build(const app_model_snapshot_t *model, int rotation, bool
     lv_obj_set_style_text_color(pointer, lv_color_hex(KP_RED), 0);
     lv_obj_align(pointer, LV_ALIGN_TOP_MID, 0, 21);
 
-    ui_common_label(screen, "正在转动...", 10, 211, 220, LV_TEXT_ALIGN_CENTER, false);
-    ui_common_footer(screen, "抽奖进行中，请等待", true);
+    ui_common_label(screen, "正在转动...", 10, 195, 220, LV_TEXT_ALIGN_CENTER, false);
+    ui_common_footer(screen, "B1 B2选择  B3确认  长按B1主页", false);
     return screen;
 }
 

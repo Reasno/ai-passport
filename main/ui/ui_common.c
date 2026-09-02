@@ -116,16 +116,26 @@ void ui_common_footer(lv_obj_t *screen, const char *text, bool loading)
 }
 void ui_common_message(lv_obj_t *screen, const char *text, bool error)
 {
-    lv_obj_t *box = ui_common_card(screen, 12, 238, 216, 42, false, true);
+    lv_obj_t *box = lv_obj_create(screen);
+    base_obj(box);
+    lv_obj_set_width(box, 216);
+    lv_obj_set_height(box, LV_SIZE_CONTENT);
+    lv_obj_set_style_pad_left(box, 8, 0); lv_obj_set_style_pad_right(box, 8, 0);
+    lv_obj_set_style_pad_top(box, 6, 0); lv_obj_set_style_pad_bottom(box, 6, 0);
+    lv_obj_set_style_radius(box, 10, 0);
     lv_obj_set_style_bg_color(box, lv_color_hex(error ? 0x592A35 : 0x183D37), 0);
+    lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(box, 1, 0);
     lv_obj_set_style_border_color(box, lv_color_hex(error ? KP_RED : KP_GREEN), 0);
     lv_obj_t *label = lv_label_create(box);
-    lv_obj_set_width(label, 198); lv_obj_set_height(label, 34);
+    lv_obj_set_width(label, 198); lv_obj_set_height(label, LV_SIZE_CONTENT);
     lv_obj_set_style_text_font(label, UI_FONT_BODY, 0); lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_color(label, lv_color_hex(KP_TEXT), 0);
     lv_obj_set_style_pad_top(label, 0, 0); lv_obj_set_style_pad_bottom(label, 0, 0);
     lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP); lv_label_set_text(label, text);
-    lv_obj_align(label, LV_ALIGN_CENTER, 0, -1);
+    lv_obj_set_pos(label, 0, 0);
+    lv_obj_update_layout(box);
+    lv_obj_align(box, LV_ALIGN_BOTTOM_MID, 0, -40);
 }
 void ui_common_find_overlay(lv_obj_t *screen, bool bright)
 {

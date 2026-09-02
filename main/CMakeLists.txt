@@ -1,4 +1,5 @@
 file(GLOB GENERIC_ICON_SRCS "assets/icons/*.c")
+file(GLOB LOGO_RGB565_SRCS "assets/logo_rgb565/*.c")
 
 idf_component_register(
     SRCS "main.c"
@@ -27,15 +28,8 @@ idf_component_register(
          "assets/avatar_brother.c"
          "assets/avatar_sister.c"
          "assets/lottery_assets.c"
-         "assets/lottery/lottery_mcd.c"
-         "assets/lottery/lottery_cash20.c"
-         "assets/lottery/lottery_cash10.c"
-         "assets/lottery/lottery_cash2.c"
-         "assets/lottery/lottery_points10.c"
-         "assets/lottery/lottery_points5.c"
-         "assets/lottery/lottery_points2.c"
-         "assets/lottery/lottery_wheel.c"
          ${GENERIC_ICON_SRCS}
+         ${LOGO_RGB565_SRCS}
          "sound/sound_service.c"
          "fonts/lv_font_noto_sc_14.c"
          "fonts/lv_font_noto_sc_18.c"

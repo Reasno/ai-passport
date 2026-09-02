@@ -51,8 +51,10 @@ static void game_card(lv_obj_t *screen, int y, bool selected, bool enabled, ui_p
                       const char *title, const char *detail)
 {
     lv_obj_t *card = ui_common_card(screen, 12, y, 216, 66, selected, enabled);
-    if (icon == UI_PIXEL_ICON_RADAR) ui_radar_icon_create(card, 14, 13, enabled ? KP_THEME : KP_MUTED, 3);
-    else ui_pixel_icon_create(card, icon, 14, 13, enabled ? KP_THEME : KP_MUTED, 3);
+    lv_obj_t *image = icon == UI_PIXEL_ICON_RADAR
+                          ? ui_radar_icon_create(card, 0, 0, enabled ? KP_THEME : KP_MUTED, 3)
+                          : ui_pixel_icon_create(card, icon, 0, 0, enabled ? KP_THEME : KP_MUTED, 3);
+    if (image) lv_obj_align(image, LV_ALIGN_LEFT_MID, 14, 0);
     ui_common_label(card, title, 56, 7, 148, LV_TEXT_ALIGN_LEFT, false);
     lv_obj_t *d = ui_common_label_small(card, detail, 56, 38, 148, LV_TEXT_ALIGN_LEFT);
     lv_obj_set_style_text_color(d, lv_color_hex(enabled ? KP_MUTED_LIGHT : KP_MUTED), 0);
@@ -61,7 +63,7 @@ static void game_card(lv_obj_t *screen, int y, bool selected, bool enabled, ui_p
 lv_obj_t *ui_games_build(const app_model_snapshot_t *model, const game_snapshot_t *game, int selected)
 {
     lv_obj_t *screen = ui_common_screen("互动游戏", model);
-    const char *pair = game->paired ? "已配对 长按中键重配" : "未配对 长按中键配对";
+    const char *pair = game->paired ? "已配对 长按B3重配" : "未配对 长按B3配对";
     ui_common_label_small(screen, pair, 12, 31, 216, LV_TEXT_ALIGN_CENTER);
     game_card(screen, 52, selected == 0, game_service_heap_allows_radar() && game->paired,
               UI_PIXEL_ICON_RADAR, "找伙伴", game->paired ? "响铃和近距离信号" : "请先完成配对");
@@ -71,7 +73,7 @@ lv_obj_t *ui_games_build(const app_model_snapshot_t *model, const game_snapshot_
     lv_obj_t *h = ui_common_label_small(screen, heap, 12, 211, 216, LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_text_color(h, lv_color_hex(KP_MUTED), 0);
     if (game->state == GAME_STATE_PAIRING) ui_common_message(screen, game->status, false);
-    ui_common_footer(screen, "上下选择 中键进入 长按中键配对", false);
+    ui_common_footer(screen, "B1 B2选择  B3确认  长按B1主页", false);
     return screen;
 }
 
@@ -79,7 +81,8 @@ lv_obj_t *ui_find_build(const app_model_snapshot_t *model, const game_snapshot_t
                         const char *find_status, bool waiting)
 {
     lv_obj_t *screen = ui_common_screen("找伙伴", model);
-    ui_radar_icon_create(screen, 91, 32, KP_THEME, 5);
+    lv_obj_t *radar = ui_radar_icon_create(screen, 0, 0, KP_THEME, 5);
+    if (radar) lv_obj_align(radar, LV_ALIGN_TOP_MID, 0, 32);
     const char *who = game->peer_nearby ? "伙伴就在附近" : "等待近距离信号";
     ui_common_label(screen, who, 20, 99, 200, LV_TEXT_ALIGN_CENTER, true);
     char rssi[48];
@@ -94,9 +97,9 @@ lv_obj_t *ui_find_build(const app_model_snapshot_t *model, const game_snapshot_t
     lv_obj_t *s = ui_common_label_small(screen, status, 12, 213, 216, LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_text_color(s, lv_color_hex(waiting ? KP_YELLOW : (model->mqtt_online ? KP_MUTED_LIGHT : KP_RED)), 0);
     bool ptt = ptt_service_available();
-    lv_obj_t *p = ui_common_label_small(screen, ptt ? (ptt_service_is_transmitting() ? "正在说话 松开下键结束" : "长按下键对讲") : "对讲不可用", 12, 234, 216, LV_TEXT_ALIGN_CENTER);
+    lv_obj_t *p = ui_common_label_small(screen, ptt ? (ptt_service_is_transmitting() ? "正在说话 松开B2结束" : "长按B2对讲") : "对讲不可用", 12, 234, 216, LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_text_color(p, lv_color_hex(ptt ? KP_GREEN : KP_MUTED), 0);
-    ui_common_footer(screen, "中键响铃 长按下键对讲 长按上键主页", false);
+    ui_common_footer(screen, "B1 B2选择  B3确认  长按B1主页", false);
     return screen;
 }
 
@@ -108,16 +111,16 @@ lv_obj_t *ui_rps_build(const app_model_snapshot_t *model, const game_snapshot_t 
     rps_choice_card(screen, 166, &s_rps_paper, "布", game->local_choice == RPS_PAPER);
     ui_common_label(screen, game->status, 12, 137, 216, LV_TEXT_ALIGN_CENTER, false);
     if (game->state == GAME_STATE_WAITING_CHOICE) {
-        ui_common_label_small(screen, "上键石头  中键剪刀  下键布", 6, 178, 228, LV_TEXT_ALIGN_CENTER);
+        ui_common_label_small(screen, "B1石头  B3剪刀  B2布", 6, 178, 228, LV_TEXT_ALIGN_CENTER);
     } else if (game->state == GAME_STATE_INVITE_RECEIVED) {
-        ui_common_label(screen, "上键拒绝 中键接受", 20, 178, 200, LV_TEXT_ALIGN_CENTER, false);
+        ui_common_label(screen, "B1拒绝 B3接受", 20, 178, 200, LV_TEXT_ALIGN_CENTER, false);
     } else if (game->state == GAME_STATE_RESULT) {
         ui_common_label_small(screen, "纯娱乐 不增减积分", 12, 178, 216, LV_TEXT_ALIGN_CENTER);
-        ui_common_label(screen, "中键返回互动游戏", 12, 203, 216, LV_TEXT_ALIGN_CENTER, false);
+        ui_common_label(screen, "B3返回互动游戏", 12, 203, 216, LV_TEXT_ALIGN_CENTER, false);
     } else {
         char left[40]; snprintf(left, sizeof(left), "剩余 %lu 秒", (unsigned long)game->seconds_left);
         ui_common_label(screen, left, 20, 178, 200, LV_TEXT_ALIGN_CENTER, false);
     }
-    ui_common_footer(screen, "本地娱乐对战", false);
+    ui_common_footer(screen, "B1 B2选择  B3确认  长按B1主页", false);
     return screen;
 }
