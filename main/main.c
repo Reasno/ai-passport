@@ -3,6 +3,7 @@
 #include "nvs_cache.h"
 #include "battery_service.h"
 #include "espnow_service.h"
+#include "find_service.h"
 #include "game_service.h"
 #include "ptt_service.h"
 #include "power_service.h"
@@ -40,6 +41,8 @@ void app_main(void)
     esp_err_t audio = sound_service_start();
     if (audio != ESP_OK) ESP_LOGW(TAG, "音效不可用: %s", esp_err_to_name(audio));
     esp_err_t wifi = wifi_service_start();
+    /* Find de-duplication must exist before either transport can deliver a ring. */
+    ESP_ERROR_CHECK_WITHOUT_ABORT(find_service_start());
     if (wifi != ESP_OK) ESP_LOGW(TAG, "WiFi后台启动失败: %s，继续离线模式", esp_err_to_name(wifi));
     else {
         esp_err_t now = espnow_service_start();

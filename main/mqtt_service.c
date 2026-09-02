@@ -4,6 +4,7 @@
 #include "cJSON.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "find_service.h"
 #include "mbedtls/sha256.h"
 #include "mqtt_client.h"
 #include <stdio.h>
@@ -348,10 +349,10 @@ static void handle_payload(void)
         const char *sender = json_string(root, "sender");
         if (!sender) sender = json_string(root, "device_id");
         if (sender && strcmp(sender, CONFIG_KIDS_DEVICE_ID) != 0) {
-            app_event_t event = {.type = topic_is(s_find_ring_topic) ? APP_EVT_FIND_RING : APP_EVT_FIND_ACK};
-            strlcpy(event.text, sender, sizeof(event.text));
-            app_event_post(&event, 0);
-            ESP_LOGI(TAG, "Find %s from=%s", topic_is(s_find_ring_topic) ? "ring" : "ack", sender);
+            /* Hand off to find_service so the ESP-NOW copy of the same ts rings only once. */
+            cJSON *ts_item = cJSON_GetObjectItemCaseSensitive(root, "ts");
+            uint32_t ts = cJSON_IsNumber(ts_item) ? (uint32_t)ts_item->valuedouble : 0;
+            find_service_on_mqtt(topic_is(s_find_ring_topic), sender, ts);
         }
         cJSON_Delete(root);
         return;
@@ -521,7 +522,7 @@ static bool publish_action(const char *item_field, const char *item_id, app_pend
 bool mqtt_service_publish_complete_task(const char *task_id) { return publish_action("task_id", task_id, APP_PENDING_TASK); }
 bool mqtt_service_publish_redeem(const char *reward_id) { return publish_action("reward_id", reward_id, APP_PENDING_REDEEM); }
 
-static bool publish_find(const char *target, const char *suffix)
+static bool publish_find(const char *target, const char *suffix, uint32_t ts)
 {
     app_model_snapshot(&s_mqtt_publish_model);
     if (!s_client || !s_mqtt_publish_model.mqtt_online || !target || !target[0]) return false;
@@ -530,13 +531,16 @@ static bool publish_find(const char *target, const char *suffix)
     cJSON *root = cJSON_CreateObject();
     if (!root) return false;
     cJSON_AddStringToObject(root, "sender", CONFIG_KIDS_DEVICE_ID);
+    /* `ts` is the cross-transport idempotency token shared with the ESP-NOW copy. */
+    cJSON_AddNumberToObject(root, "ts", (double)ts);
     cJSON_AddNumberToObject(root, "timestamp_ms", (double)(esp_timer_get_time() / 1000));
+    cJSON_AddStringToObject(root, "channel", "mqtt");
     char *payload = cJSON_PrintUnformatted(root);
     int msg_id = payload ? esp_mqtt_client_publish(s_client, topic, payload, 0, 1, false) : -1;
     cJSON_free(payload);
     cJSON_Delete(root);
-    ESP_LOGI(TAG, "Find publish topic=%s msg_id=%d", topic, msg_id);
+    ESP_LOGI(TAG, "Find publish topic=%s ts=%lu msg_id=%d", topic, (unsigned long)ts, msg_id);
     return msg_id >= 0;
 }
-bool mqtt_service_publish_find_ring(void) { return publish_find(CONFIG_KIDS_PEER_DEVICE_ID, "ring"); }
-bool mqtt_service_publish_find_ack(const char *target_device_id) { return publish_find(target_device_id, "ack"); }
+bool mqtt_service_publish_find_ring(uint32_t ts) { return publish_find(CONFIG_KIDS_PEER_DEVICE_ID, "ring", ts); }
+bool mqtt_service_publish_find_ack(const char *target_device_id, uint32_t ts) { return publish_find(target_device_id, "ack", ts); }

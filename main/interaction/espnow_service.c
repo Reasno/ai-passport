@@ -1,4 +1,5 @@
 #include "espnow_service.h"
+#include "find_service.h"
 #include "game_service.h"
 #include "ptt_service.h"
 #include "esp_crc.h"
@@ -64,6 +65,13 @@ static void rx_task(void *arg)
 #endif
         uint8_t own[6]; esp_read_mac(own, ESP_MAC_WIFI_STA);
         if (memcmp(own, event.src, 6) == 0) continue;
+        /* Find ring/ack bypass the game state machine: they must survive regardless of the
+         * current game state, and they carry their own ts-based de-duplication. */
+        if (p->type == ESPNOW_MSG_FIND_RING || p->type == ESPNOW_MSG_FIND_ACK) {
+            if (!s_has_peer || memcmp(s_peer, event.src, 6) != 0) continue;
+            find_service_on_espnow(p->type == ESPNOW_MSG_FIND_RING, espnow_find_ts(p));
+            continue;
+        }
         game_service_on_packet(event.src, p, event.rssi);
     }
 }
@@ -98,8 +106,8 @@ esp_err_t espnow_service_store_peer(const uint8_t mac[6])
     ESP_LOGI(TAG, "paired peer=" MACSTR " nvs=%s", MAC2STR(mac), esp_err_to_name(err));
     return err;
 }
-esp_err_t espnow_service_send(espnow_msg_type_t type, uint16_t session, uint16_t sequence,
-                              uint8_t choice, int8_t value, bool broadcast)
+static esp_err_t send_packet(espnow_msg_type_t type, uint16_t session, uint16_t sequence, uint8_t choice,
+                             int8_t value, uint16_t reserved, bool broadcast)
 {
     if (!s_ready || (!broadcast && !s_has_peer)) return ESP_ERR_INVALID_STATE;
     espnow_game_packet_t p = {.magic=ESPNOW_MAGIC,.version=ESPNOW_VERSION,.type=type,
@@ -108,12 +116,23 @@ esp_err_t espnow_service_send(espnow_msg_type_t type, uint16_t session, uint16_t
 #else
         .actor=1,
 #endif
-        .choice=choice,.session=session,.sequence=sequence ? sequence : ++s_sequence,.value=value};
+        .choice=choice,.session=session,.sequence=sequence ? sequence : ++s_sequence,.value=value,.reserved=reserved};
     p.checksum = packet_crc(&p);
     const uint8_t *target = broadcast ? BROADCAST : s_peer;
     esp_err_t err = esp_now_send(target, (const uint8_t *)&p, sizeof(p));
     if (err != ESP_OK) ESP_LOGW(TAG, "send type=%u failed: %s", type, esp_err_to_name(err));
     return err;
+}
+esp_err_t espnow_service_send(espnow_msg_type_t type, uint16_t session, uint16_t sequence,
+                              uint8_t choice, int8_t value, bool broadcast)
+{
+    return send_packet(type, session, sequence, choice, value, 0, broadcast);
+}
+/* Find ring/ack always go straight to the paired sibling; the 32-bit ts is split so both
+ * transports (ESP-NOW here, MQTT elsewhere) advertise the same idempotency token. */
+esp_err_t espnow_service_send_find(espnow_msg_type_t type, uint32_t ts)
+{
+    return send_packet(type, (uint16_t)(ts & 0xFFFF), 0, 0, 0, (uint16_t)(ts >> 16), false);
 }
 esp_err_t espnow_service_send_raw_to_peer(const void *data, size_t len)
 {

@@ -27,4 +27,7 @@ lv_obj_t *ui_common_label(lv_obj_t *parent, const char *text, int x, int y, int 
 lv_obj_t *ui_common_label_small(lv_obj_t *parent, const char *text, int x, int y, int w, lv_text_align_t align);
 void ui_common_footer(lv_obj_t *screen, const char *text, bool loading);
 void ui_common_message(lv_obj_t *screen, const char *text, bool error);
-void ui_common_find_overlay(lv_obj_t *screen, bool bright);
+/* Returns the overlay card so the caller can re-tint it for the ring flash
+ * without rebuilding (and re-rasterising the CJK text of) the whole screen. */
+lv_obj_t *ui_common_find_overlay(lv_obj_t *screen, bool bright);
+void ui_common_find_overlay_tint(lv_obj_t *box, bool bright);

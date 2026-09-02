@@ -1,7 +1,11 @@
 build/
+build_sister/
 sdkconfig
 sdkconfig.old
+sdkconfig.sister
+sdkconfig.sister.old
 sdkconfig.defaults
+sdkconfig.defaults.sister
 managed_components/
 .vscode/
 .idea/

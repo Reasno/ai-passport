@@ -7,6 +7,7 @@
 
 #include "bsp_display.h"
 #include "esp_log.h"
+#include "find_service.h"
 #include "driver/usb_serial_jtag_vfs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -143,6 +144,26 @@ static void screenshot_task(void *arg)
             fsync(STDOUT_FILENO);
             continue;
         }
+        /* RING <espnow|mqtt> <ts> injects an inbound ring so the cross-transport ts
+         * de-duplication can be exercised without a second Passport on the bench. */
+        if (strncmp(command, "RING ", 5) == 0) {
+            char via[16] = {0};
+            unsigned long ts = 0;
+            char response[64];
+            int parsed = sscanf(command + 5, "%15s %lu", via, &ts);
+            if (parsed == 2) {
+                bool espnow = strcmp(via, "espnow") == 0;
+                if (espnow) find_service_on_espnow(true, (uint32_t)ts);
+                else find_service_on_mqtt(true, CONFIG_KIDS_PEER_DEVICE_ID, (uint32_t)ts);
+                int length = snprintf(response, sizeof(response), "KP_RING_OK %s %lu\n", via, ts);
+                write_all(response, (size_t)length);
+            } else {
+                static const char error[] = "KP_RING_ERR USAGE\n";
+                write_all(error, sizeof(error) - 1);
+            }
+            fsync(STDOUT_FILENO);
+            continue;
+        }
         if (strncmp(command, "PAGE ", 5) == 0) {
             post_page_command(command + 5);
             continue;
@@ -164,6 +185,24 @@ static void screenshot_task(void *arg)
     }
 }
 
+/* Runs above the LVGL port task so it still reports while lower-priority tasks
+ * are blocked or starved; this is how a hung UI task gets diagnosed on-device.
+ * ui_task publishes the stage it is entering, so a frozen value names the exact
+ * call that is not returning. */
+extern volatile int g_kp_ui_stage;
+extern volatile unsigned g_kp_ui_loops;
+extern volatile int g_kp_ui_event;
+
+static void taskdump_task(void *arg)
+{
+    (void)arg;
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(3000));
+        ESP_LOGW("kp_tasks", "ui_stage=%d ui_event=%d ui_loops=%u free=%u",
+                 g_kp_ui_stage, g_kp_ui_event, g_kp_ui_loops, (unsigned)esp_get_free_heap_size());
+    }
+}
+
 esp_err_t screenshot_service_start(void)
 {
     lv_display_t *display = lv_display_get_default();
@@ -173,6 +212,7 @@ esp_err_t screenshot_service_start(void)
     if (xTaskCreatePinnedToCore(screenshot_task, "kp_shot", 6144, display, 1, NULL, 0) != pdPASS) {
         return ESP_ERR_NO_MEM;
     }
+    xTaskCreatePinnedToCore(taskdump_task, "kp_tasks", 3072, NULL, 6, NULL, 0);
     return ESP_OK;
 }
 

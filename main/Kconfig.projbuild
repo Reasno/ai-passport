@@ -17,6 +17,31 @@ config MQTT_BROKER_PORT
     range 1 65535
     default 1883
 
+config KP_ESPNOW_CHANNEL
+    int "离线时 ESP-NOW 固定信道"
+    range 1 13
+    default 1
+    help
+      断开 Wi-Fi 后 STA 会反复全信道扫描，ESP-NOW 收发会跟着漂移。
+      每次重连失败后把信道钉在这个值上，两台 Passport 才能在外出（无 Wi-Fi）
+      时靠 ESP-NOW 直连响铃。两台设备必须配置同一个信道。
+
+config KP_WIFI_RETRY_FAST_TRIES
+    int "断网后快速重连次数"
+    range 0 20
+    default 3
+    help
+      前 N 次断线按 2s 间隔快速重连（覆盖路由器重启等短暂抖动）；
+      之后退避到慢速间隔，把射频让给 ESP-NOW。
+
+config KP_WIFI_RETRY_SLOW_MS
+    int "退避后的重连间隔(ms)"
+    range 5000 600000
+    default 60000
+    help
+      退避期间信道保持固定，ESP-NOW 才有稳定的收发窗口。间隔越长，
+      外出时直连越可靠，回家后自动重连越慢。
+
 choice KIDS_ACTOR
     prompt "绑定孩子"
     default KIDS_ACTOR_BROTHER
