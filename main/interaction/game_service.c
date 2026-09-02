@@ -48,7 +48,7 @@ static void finish_if_ready(void)
     if (s_game.local_choice == RPS_NONE || s_game.remote_choice == RPS_NONE) return;
     bool first_result = s_game.state != GAME_STATE_RESULT;
     s_game.state = GAME_STATE_RESULT; s_game.result = result_for(s_game.local_choice, s_game.remote_choice);
-    status(s_game.result > 0 ? "你赢了！" : s_game.result < 0 ? "下次加油！" : "平局，再来一次！");
+    status(s_game.result > 0 ? "你赢了！" : s_game.result < 0 ? "你输了，下次加油！" : "平局，再来一次！");
     if (first_result) s_deadline = now_ms() + 2000;
     ESP_LOGI(TAG, "RPS entertainment result session=%u local=%u remote=%u result=%d (no points, no MQTT)",
              s_game.session, s_game.local_choice, s_game.remote_choice, s_game.result);
@@ -80,8 +80,14 @@ void game_service_cancel(void)
 {
     if (!s_lock) return;
     xSemaphoreTake(s_lock, portMAX_DELAY);
-    if (s_game.state == GAME_STATE_INVITE_SENT || s_game.state == GAME_STATE_COUNTDOWN || s_game.state == GAME_STATE_WAITING_CHOICE)
-        espnow_service_send(ESPNOW_MSG_RPS_CANCEL, s_game.session, 0, 0, 0, false);
+    if (s_game.state == GAME_STATE_INVITE_SENT || s_game.state == GAME_STATE_INVITE_RECEIVED ||
+        s_game.state == GAME_STATE_COUNTDOWN || s_game.state == GAME_STATE_WAITING_CHOICE ||
+        s_game.state == GAME_STATE_RESULT) {
+        /* Exit is user-visible state: send a short burst so one lost ESP-NOW frame
+         * cannot leave the peer stranded in the game. */
+        for (int i = 0; i < 3; i++)
+            espnow_service_send(ESPNOW_MSG_RPS_CANCEL, s_game.session, 0, 0, 0, false);
+    }
     s_game.state = GAME_STATE_IDLE; s_game.radar_active = false; status("已取消"); s_deadline = 0; xSemaphoreGive(s_lock); notify();
 }
 void game_service_set_radar(bool active)
@@ -114,7 +120,7 @@ void game_service_respond_invite(bool accept)
     if (accept) {
         s_game.state = GAME_STATE_COUNTDOWN; s_countdown_started = now_ms(); s_game.countdown = 3;
         s_game.local_choice = s_game.remote_choice = RPS_NONE; s_game.cursor_choice = RPS_ROCK;
-        s_choice_acked = false; status("3");
+        s_choice_acked = false; status("即将开始");
     }
     else { s_game.state = GAME_STATE_IDLE; status("已拒绝挑战"); }
     xSemaphoreGive(s_lock); notify();
@@ -167,7 +173,7 @@ void game_service_tick(int64_t now)
     if (s_game.state == GAME_STATE_COUNTDOWN) {
         int elapsed = (int)((now - s_countdown_started) / 1000);
         uint8_t count = elapsed >= 3 ? 0 : 3 - elapsed;
-        if (count != s_game.countdown) { s_game.countdown = count; if (count) { char t[2] = {(char)('0' + count),0}; status(t); } changed = true; }
+        if (count != s_game.countdown) { s_game.countdown = count; changed = true; }
         if (!count) { s_game.state = GAME_STATE_WAITING_CHOICE; status("请出拳！"); s_deadline = now + CHOICE_TIMEOUT_MS; changed = true; }
     }
     if (s_game.state == GAME_STATE_WAITING_CHOICE && now >= s_deadline) { s_game.state = GAME_STATE_RESULT; s_game.result = s_game.local_choice != RPS_NONE ? 1 : -1; status(s_game.result > 0 ? "对方超时，你赢了！" : "出拳超时"); changed = true; }
@@ -189,6 +195,20 @@ void game_service_on_packet(const uint8_t src[6], const espnow_game_packet_t *p,
         uint8_t peer[6]; if (!espnow_service_get_peer(peer) || memcmp(peer, src, 6) != 0) { xSemaphoreGive(s_lock); return; }
         if (p->type == ESPNOW_MSG_RADAR_PING) espnow_service_send(ESPNOW_MSG_RADAR_PONG, 0, p->sequence, 0, 0, false);
         else if (p->type == ESPNOW_MSG_RADAR_PONG && s_game.radar_active) { s_game.rssi = rssi; s_game.distance_bars = bars_for_rssi(rssi); s_game.peer_nearby = true; s_last_radar_rx = now_ms(); changed = true; }
+        else if (p->type == ESPNOW_MSG_RPS_INVITE && s_game.state == GAME_STATE_INVITE_SENT) {
+            /* Simultaneous invite tie-breaker: the lexicographically smaller device ID
+             * becomes the receiver; the larger ID keeps its original session. */
+            if (strcmp(CONFIG_KIDS_DEVICE_ID, CONFIG_KIDS_PEER_DEVICE_ID) < 0) {
+                ESP_LOGI(TAG, "simultaneous invite: %s yields to %s", CONFIG_KIDS_DEVICE_ID,
+                         CONFIG_KIDS_PEER_DEVICE_ID);
+                s_game.session = p->session; s_game.state = GAME_STATE_COUNTDOWN;
+                s_game.local_choice = s_game.remote_choice = RPS_NONE; s_game.cursor_choice = RPS_ROCK;
+                s_game.countdown = 3; s_countdown_started = now_ms(); s_last_rps_tx = now_ms();
+                s_choice_acked = false; s_invite_receiver = true; status("即将开始");
+                espnow_service_send(ESPNOW_MSG_RPS_ACCEPT, s_game.session, 0, 0, 0, false);
+                changed = true;
+            }
+        }
         else if (p->type == ESPNOW_MSG_RPS_INVITE && s_game.state == GAME_STATE_IDLE) {
             s_game.session = p->session; s_game.state = GAME_STATE_INVITE_RECEIVED;
             s_game.local_choice = s_game.remote_choice = RPS_NONE; s_game.cursor_choice = RPS_ROCK;
@@ -201,9 +221,13 @@ void game_service_on_packet(const uint8_t src[6], const espnow_game_packet_t *p,
         }
         else if (p->type == ESPNOW_MSG_RPS_ACCEPT && s_game.state == GAME_STATE_INVITE_SENT && p->session == s_game.session) {
             s_game.state = GAME_STATE_COUNTDOWN; s_countdown_started = now_ms(); s_game.countdown = 3;
-            s_last_rps_tx = now_ms(); status("3"); changed = true;
+            s_last_rps_tx = now_ms(); status("即将开始"); changed = true;
         }
-        else if ((p->type == ESPNOW_MSG_RPS_REJECT || p->type == ESPNOW_MSG_RPS_CANCEL) && p->session == s_game.session) { s_game.state = GAME_STATE_IDLE; status(p->type == ESPNOW_MSG_RPS_REJECT ? "对方拒绝了挑战" : "对方取消了对战"); changed = true; }
+        else if ((p->type == ESPNOW_MSG_RPS_REJECT || p->type == ESPNOW_MSG_RPS_CANCEL) && p->session == s_game.session) {
+            s_game.state = GAME_STATE_IDLE;
+            status(p->type == ESPNOW_MSG_RPS_REJECT ? "对方拒绝了挑战" : "对方退出了游戏");
+            changed = true;
+        }
         else if (p->type == ESPNOW_MSG_RPS_CHOICE && p->session == s_game.session && p->choice >= RPS_ROCK && p->choice <= RPS_PAPER) {
             espnow_service_send(ESPNOW_MSG_RPS_CHOICE_ACK, s_game.session, 0, p->choice, 0, false);
             s_game.remote_choice = (rps_choice_t)p->choice;

@@ -149,9 +149,10 @@ lv_obj_t *ui_rps_build(const app_model_snapshot_t *model, const game_snapshot_t 
         ui_common_label(screen, "B2拒绝 B3接受", 20, 178, 200, LV_TEXT_ALIGN_CENTER, false);
         footer = "B2拒绝  B3接受  长按B1主页";
     } else if (game->state == GAME_STATE_RESULT) {
-        ui_common_label_small(screen, "纯娱乐 不增减积分", 12, 178, 216, LV_TEXT_ALIGN_CENTER);
-        ui_common_label(screen, "B3返回互动游戏", 12, 203, 216, LV_TEXT_ALIGN_CENTER, false);
+        ui_common_label(screen, "B3返回互动游戏", 12, 190, 216, LV_TEXT_ALIGN_CENTER, false);
         footer = "B3返回  长按B1主页";
+    } else if (game->state == GAME_STATE_COUNTDOWN) {
+        /* The centered status already says 即将开始; deliberately show no seconds. */
     } else {
         char left[40]; snprintf(left, sizeof(left), "剩余 %lu 秒", (unsigned long)game->seconds_left);
         ui_common_label(screen, left, 20, 178, 200, LV_TEXT_ALIGN_CENTER, false);

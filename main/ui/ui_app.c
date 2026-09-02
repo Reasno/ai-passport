@@ -304,7 +304,11 @@ static void process_event(const app_event_t *event)
             bsp_lvgl_unlock();
         }
     } else if (event->type == APP_EVT_GAME_UPDATE) {
-        game_snapshot_t *game = game_snapshot(); if (game->state == GAME_STATE_INVITE_RECEIVED) s_page = PAGE_RPS; render();
+        game_snapshot_t *game = game_snapshot();
+        if (game->state == GAME_STATE_INVITE_RECEIVED) s_page = PAGE_RPS;
+        else if (s_page == PAGE_RPS && game->state == GAME_STATE_IDLE && strcmp(game->status, "对方退出了游戏") == 0)
+            go(PAGE_HOME, 0);
+        else render();
     } else if (event->type == APP_EVT_DATA_ERROR || event->type == APP_EVT_ACTION_TIMEOUT) {
         set_message(event->text[0] ? event->text : "请求超时，请重试", true); sound_service_play(SOUND_DU); render();
     } else render();
