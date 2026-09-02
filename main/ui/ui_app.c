@@ -41,17 +41,6 @@ static int s_debug_prize_index;
 #endif
 static bool s_find_waiting, s_find_ringing, s_find_flash, s_ignore_key_until_release, s_ignore_ring_click;
 static lv_obj_t *s_find_overlay;
-#if CONFIG_ENABLE_SCREENSHOT
-static unsigned s_render_count;
-/* Published for the diagnostic task: the last stage ui_task entered. A frozen
- * value identifies exactly which call failed to return. */
-volatile int g_kp_ui_stage;
-volatile unsigned g_kp_ui_loops;
-volatile int g_kp_ui_event = -1;
-#define KP_STAGE(n) (g_kp_ui_stage = (n))
-#else
-#define KP_STAGE(n) ((void)0)
-#endif
 static int64_t s_find_deadline, s_find_ring_deadline, s_find_next_flash;
 static char s_find_status[64], s_find_sender[64];
 /* Large cross-module snapshots are static to preserve the measured-safe 4 KB UI stack. */
@@ -68,13 +57,9 @@ static void set_message(const char *text, bool error)
 }
 static void render(void)
 {
-    KP_STAGE(20);
     app_model_snapshot_t *model = model_snapshot();
-    KP_STAGE(21);
     game_snapshot_t *game = game_snapshot();
-    KP_STAGE(22);
 #if CONFIG_ENABLE_SCREENSHOT
-    s_render_count++;
     /* Preview-only snapshots never mutate ESP-NOW, MQTT, pairing, radar or RPS state. */
     if (s_debug_preview && s_page == PAGE_FIND) {
         game->paired = true;
@@ -95,9 +80,7 @@ static void render(void)
         strlcpy(game->status, "请选择出拳", sizeof(game->status));
     }
 #endif
-    KP_STAGE(23);
-    if (!bsp_lvgl_lock(1000)) { KP_STAGE(29); return; }
-    KP_STAGE(24);
+    if (!bsp_lvgl_lock(1000)) return;
     lv_obj_t *screen = NULL;
     if (s_page == PAGE_HOME) screen = ui_home_build(model, s_selected);
     else if (s_page == PAGE_TASKS) screen = ui_tasks_build(model, s_selected);
@@ -114,14 +97,10 @@ static void render(void)
     else if (s_page == PAGE_FIND) screen = ui_find_build(model, game, s_find_status, s_find_waiting);
     else screen = ui_rps_build(model, game);
     if (s_message[0] && esp_timer_get_time() / 1000 < s_message_until) ui_common_message(screen, s_message, s_message_error);
-    KP_STAGE(25);
     if (s_find_ringing) s_find_overlay = ui_common_find_overlay(screen, s_find_flash);
     else s_find_overlay = NULL;
-    KP_STAGE(26);
     lv_screen_load_anim(screen, LV_SCR_LOAD_ANIM_NONE, 0, 0, true);
-    KP_STAGE(27);
     bsp_lvgl_unlock();
-    KP_STAGE(28);
 }
 static void go(page_t page, int selected)
 {
@@ -329,40 +308,21 @@ static void ui_task(void *arg)
 {
     (void)arg; render(); ESP_LOGI(TAG, "UI启动 stack high-water=%u", (unsigned)uxTaskGetStackHighWaterMark(NULL));
     app_event_t event; int64_t next_game_tick = 0;
-#if CONFIG_ENABLE_SCREENSHOT
-    int64_t next_beat = 0; unsigned loops = 0, events = 0;
-#endif
     for (;;) {
-        KP_STAGE(1);
         if (xQueueReceive(app_events_queue(), &event, pdMS_TO_TICKS(100)) == pdTRUE) {
-            KP_STAGE(2);
-#if CONFIG_ENABLE_SCREENSHOT
-            g_kp_ui_event = (int)event.type;
-#endif
             process_event(&event);
-#if CONFIG_ENABLE_SCREENSHOT
-            events++;
-#endif
         }
-        KP_STAGE(3);
-        int64_t now = esp_timer_get_time() / 1000; app_model_snapshot_t *model = model_snapshot();
-        KP_STAGE(4);
-#if CONFIG_ENABLE_SCREENSHOT
-        loops++; g_kp_ui_loops = loops;
-        if (now >= next_beat) {
-            next_beat = now + 2000;
-            ESP_LOGI(TAG, "beat loops=%u events=%u renders=%u ring=%d left=%lldms",
-                     loops, events, s_render_count, (int)s_find_ringing,
-                     (long long)(s_find_ringing ? s_find_ring_deadline - now : 0));
+        int64_t now = esp_timer_get_time() / 1000;
+        app_model_snapshot_t *model = model_snapshot();
+        if (model->pending_type != APP_PENDING_NONE && now >= model->pending_deadline_ms) {
+            ESP_LOGW(TAG, "请求超时 key=%s", model->pending_key);
+            app_model_finish_pending();
+            app_event_t timeout = {.type = APP_EVT_ACTION_TIMEOUT};
+            strlcpy(timeout.text, "请求超时，请重试", sizeof(timeout.text));
+            process_event(&timeout);
         }
-#endif
-        if (model->pending_type != APP_PENDING_NONE && now >= model->pending_deadline_ms) { ESP_LOGW(TAG, "请求超时 key=%s", model->pending_key);
-            app_model_finish_pending(); app_event_t timeout = {.type = APP_EVT_ACTION_TIMEOUT}; strlcpy(timeout.text, "请求超时，请重试", sizeof(timeout.text)); process_event(&timeout); }
-        KP_STAGE(5);
         if (now >= next_game_tick) { game_service_tick(now); next_game_tick = now + 200; }
-        KP_STAGE(6);
         find_service_tick(now);
-        KP_STAGE(7);
         if (s_find_waiting && now >= s_find_deadline) {
             s_find_waiting = false; s_find_deadline = 0;
             strlcpy(s_find_status, "30秒未回应\n可再次响铃", sizeof(s_find_status));
@@ -381,18 +341,18 @@ static void ui_task(void *arg)
         /* Re-tint the existing overlay instead of calling render(): a full rebuild
          * re-rasterises every CJK glyph on the page, which on this chip costs more
          * than the flash interval and starves the idle task into a WDT reset. */
-        KP_STAGE(8);
         if (s_find_ringing && now >= s_find_next_flash) {
             s_find_flash = !s_find_flash; s_find_next_flash = now + 500;
-            KP_STAGE(9);
             if (s_find_overlay && bsp_lvgl_lock(100)) {
                 ui_common_find_overlay_tint(s_find_overlay, s_find_flash);
                 bsp_lvgl_unlock();
             } else render();
         }
-        KP_STAGE(10);
-        if (s_lottery_animating && now >= s_lottery_reveal_at) { s_lottery_animating = false; sound_service_play(SOUND_FANFARE); render(); }
-        KP_STAGE(11);
+        if (s_lottery_animating && now >= s_lottery_reveal_at) {
+            s_lottery_animating = false;
+            sound_service_play(SOUND_FANFARE);
+            render();
+        }
         if (s_message[0] && now >= s_message_until) { s_message[0] = 0; render(); }
     }
 }

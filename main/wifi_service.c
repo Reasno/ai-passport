@@ -2,6 +2,7 @@
 #include "app_events.h"
 #include "app_model.h"
 #include "mqtt_service.h"
+#include "time_service.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
@@ -68,6 +69,7 @@ static void wifi_event(void *arg, esp_event_base_t base, int32_t id, void *data)
         ESP_LOGI(TAG, "WiFi got IP: " IPSTR, IP2STR(&event->ip_info.ip));
         app_model_set_connectivity(true, false);
         app_event_post(&(app_event_t){.type = APP_EVT_CONNECTIVITY}, 0);
+        time_service_start();
         mqtt_service_on_ip_ready();
     }
 }

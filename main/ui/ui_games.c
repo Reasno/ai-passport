@@ -107,8 +107,23 @@ lv_obj_t *ui_find_build(const app_model_snapshot_t *model, const game_snapshot_t
     if (can_ring) snprintf(ready, sizeof(ready), "可让" KP_PEER_LABEL "响铃 (%s)", find_service_channel_label(live));
     else strlcpy(ready, "暂无可用通道\n请先配对或联网", sizeof(ready));
     const char *status = find_status && find_status[0] ? find_status : ready;
-    lv_obj_t *s = ui_common_label_small(screen, status, 12, 198, 216, LV_TEXT_ALIGN_CENTER);
-    lv_obj_set_style_text_color(s, lv_color_hex(waiting ? KP_YELLOW : (can_ring ? KP_MUTED_LIGHT : KP_RED)), 0);
+    lv_color_t status_color = lv_color_hex(waiting ? KP_YELLOW : (can_ring ? KP_MUTED_LIGHT : KP_RED));
+    /* Avoid LVGL WDT deadloops on embedded newlines: split into two single-line labels. */
+    const char *nl = strchr(status, '\n');
+    if (!nl) {
+        lv_obj_t *s = ui_common_label_small(screen, status, 12, 198, 216, LV_TEXT_ALIGN_CENTER);
+        lv_obj_set_style_text_color(s, status_color, 0);
+    } else {
+        char line1[96], line2[96];
+        size_t n1 = (size_t)(nl - status);
+        if (n1 >= sizeof(line1)) n1 = sizeof(line1) - 1;
+        memcpy(line1, status, n1); line1[n1] = 0;
+        strlcpy(line2, nl + 1, sizeof(line2));
+        lv_obj_t *s1 = ui_common_label_small(screen, line1, 12, 198, 216, LV_TEXT_ALIGN_CENTER);
+        lv_obj_t *s2 = ui_common_label_small(screen, line2, 12, 214, 216, LV_TEXT_ALIGN_CENTER);
+        lv_obj_set_style_text_color(s1, status_color, 0);
+        lv_obj_set_style_text_color(s2, status_color, 0);
+    }
     bool ptt = ptt_service_available();
     lv_obj_t *p = ui_common_label_small(screen, ptt ? (ptt_service_is_transmitting() ? "正在说话 松开B2结束" : "长按B2对讲") : "对讲不可用", 12, 240, 216, LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_text_color(p, lv_color_hex(ptt ? KP_GREEN : KP_MUTED), 0);
