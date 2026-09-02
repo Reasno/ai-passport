@@ -13,7 +13,8 @@
 #define RPS_HEAP 24576
 #define PAIR_TIMEOUT_MS 15000
 #define INVITE_TIMEOUT_MS 15000
-#define CHOICE_TIMEOUT_MS 10000
+#define CHOICE_TIMEOUT_MS 20000
+#define RPS_COUNTDOWN_SECONDS 1
 #define RPS_RETRY_MS 400
 #define RADAR_LOST_MS 5000
 
@@ -118,7 +119,7 @@ void game_service_respond_invite(bool accept)
     espnow_service_send(accept ? ESPNOW_MSG_RPS_ACCEPT : ESPNOW_MSG_RPS_REJECT, s_game.session, 0, 0, 0, false);
     s_last_rps_tx = now_ms();
     if (accept) {
-        s_game.state = GAME_STATE_COUNTDOWN; s_countdown_started = now_ms(); s_game.countdown = 3;
+        s_game.state = GAME_STATE_COUNTDOWN; s_countdown_started = now_ms(); s_game.countdown = RPS_COUNTDOWN_SECONDS;
         s_game.local_choice = s_game.remote_choice = RPS_NONE; s_game.cursor_choice = RPS_ROCK;
         s_choice_acked = false; status("即将开始");
     }
@@ -172,7 +173,7 @@ void game_service_tick(int64_t now)
     if (s_game.state == GAME_STATE_INVITE_SENT && now >= s_deadline) { s_game.state = GAME_STATE_IDLE; status("对方没有回应"); changed = true; }
     if (s_game.state == GAME_STATE_COUNTDOWN) {
         int elapsed = (int)((now - s_countdown_started) / 1000);
-        uint8_t count = elapsed >= 3 ? 0 : 3 - elapsed;
+        uint8_t count = elapsed >= RPS_COUNTDOWN_SECONDS ? 0 : RPS_COUNTDOWN_SECONDS - elapsed;
         if (count != s_game.countdown) { s_game.countdown = count; changed = true; }
         if (!count) { s_game.state = GAME_STATE_WAITING_CHOICE; status("请出拳！"); s_deadline = now + CHOICE_TIMEOUT_MS; changed = true; }
     }
@@ -203,7 +204,7 @@ void game_service_on_packet(const uint8_t src[6], const espnow_game_packet_t *p,
                          CONFIG_KIDS_PEER_DEVICE_ID);
                 s_game.session = p->session; s_game.state = GAME_STATE_COUNTDOWN;
                 s_game.local_choice = s_game.remote_choice = RPS_NONE; s_game.cursor_choice = RPS_ROCK;
-                s_game.countdown = 3; s_countdown_started = now_ms(); s_last_rps_tx = now_ms();
+                s_game.countdown = RPS_COUNTDOWN_SECONDS; s_countdown_started = now_ms(); s_last_rps_tx = now_ms();
                 s_choice_acked = false; s_invite_receiver = true; status("即将开始");
                 espnow_service_send(ESPNOW_MSG_RPS_ACCEPT, s_game.session, 0, 0, 0, false);
                 changed = true;
@@ -221,7 +222,7 @@ void game_service_on_packet(const uint8_t src[6], const espnow_game_packet_t *p,
             espnow_service_send(ESPNOW_MSG_RPS_ACCEPT, s_game.session, 0, 0, 0, false);
         }
         else if (p->type == ESPNOW_MSG_RPS_ACCEPT && s_game.state == GAME_STATE_INVITE_SENT && p->session == s_game.session) {
-            s_game.state = GAME_STATE_COUNTDOWN; s_countdown_started = now_ms(); s_game.countdown = 3;
+            s_game.state = GAME_STATE_COUNTDOWN; s_countdown_started = now_ms(); s_game.countdown = RPS_COUNTDOWN_SECONDS;
             s_last_rps_tx = now_ms(); status("即将开始"); changed = true;
         }
         else if ((p->type == ESPNOW_MSG_RPS_REJECT || p->type == ESPNOW_MSG_RPS_CANCEL) && p->session == s_game.session) {

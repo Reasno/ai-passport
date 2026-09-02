@@ -36,7 +36,7 @@ RPS_IMAGE(s_rps_paper, rps_paper_data);
 static void rps_choice_card(lv_obj_t *screen, int x, const lv_image_dsc_t *image_source,
                             const char *label, bool selected)
 {
-    lv_obj_t *card = ui_common_card(screen, x, 29, 66, 98, false, true);
+    lv_obj_t *card = ui_common_card(screen, x, 29, 66, 116, false, true);
     lv_obj_t *marker = lv_obj_get_child(card, 0);
     if (marker) lv_obj_add_flag(marker, LV_OBJ_FLAG_HIDDEN);
     lv_obj_set_style_bg_color(card, lv_color_hex(selected ? KP_CARD_ALT : KP_CARD), 0);
@@ -48,7 +48,7 @@ static void rps_choice_card(lv_obj_t *screen, int x, const lv_image_dsc_t *image
     lv_obj_align(image, LV_ALIGN_TOP_MID, 0, 4);
     lv_obj_t *caption = ui_common_label_small(card, label, 0, 0, 66, LV_TEXT_ALIGN_CENTER);
     lv_obj_set_width(caption, lv_pct(100));
-    lv_obj_align(caption, LV_ALIGN_BOTTOM_MID, 0, -1);
+    lv_obj_align(caption, LV_ALIGN_BOTTOM_MID, 0, -6);
     lv_obj_set_style_text_color(caption, lv_color_hex(selected ? KP_TEXT : KP_MUTED_LIGHT), 0);
 }
 
@@ -140,24 +140,24 @@ lv_obj_t *ui_rps_build(const app_model_snapshot_t *model, const game_snapshot_t 
     rps_choice_card(screen, 8, &s_rps_rock, "石头", shown == RPS_ROCK);
     rps_choice_card(screen, 87, &s_rps_scissors, "剪刀", shown == RPS_SCISSORS);
     rps_choice_card(screen, 166, &s_rps_paper, "布", shown == RPS_PAPER);
-    ui_common_label(screen, game->status, 12, 137, 216, LV_TEXT_ALIGN_CENTER, false);
+    ui_common_label(screen, game->status, 12, 153, 216, LV_TEXT_ALIGN_CENTER, false);
     const char *footer = "长按B1主页";
     if (game->state == GAME_STATE_WAITING_CHOICE) {
-        ui_common_label_small(screen, game->local_choice == RPS_NONE ? "选择后按确认出拳" : "已锁定出拳，等待对方", 6, 178, 228, LV_TEXT_ALIGN_CENTER);
+        ui_common_label_small(screen, game->local_choice == RPS_NONE ? "选择后按确认出拳" : "已锁定出拳，等待对方", 6, 194, 228, LV_TEXT_ALIGN_CENTER);
         footer = game->local_choice == RPS_NONE
                      ? "B1 B2选择  B3确认  长按B1主页"
                      : "等待对方  长按B1主页";
     } else if (game->state == GAME_STATE_INVITE_RECEIVED) {
-        ui_common_label(screen, "B2拒绝 B3接受", 20, 178, 200, LV_TEXT_ALIGN_CENTER, false);
+        ui_common_label(screen, "B2拒绝 B3接受", 20, 194, 200, LV_TEXT_ALIGN_CENTER, false);
         footer = "B2拒绝  B3接受  长按B1主页";
     } else if (game->state == GAME_STATE_RESULT) {
-        ui_common_label(screen, "B2返回主页  B3再来一局", 12, 190, 216, LV_TEXT_ALIGN_CENTER, false);
+        ui_common_label(screen, "B2返回主页  B3再来一局", 12, 206, 216, LV_TEXT_ALIGN_CENTER, false);
         footer = "B2返回 B3再来一局";
     } else if (game->state == GAME_STATE_COUNTDOWN) {
         /* The centered status already says 即将开始; deliberately show no seconds. */
     } else {
         char left[40]; snprintf(left, sizeof(left), "剩余 %lu 秒", (unsigned long)game->seconds_left);
-        ui_common_label(screen, left, 20, 178, 200, LV_TEXT_ALIGN_CENTER, false);
+        ui_common_label(screen, left, 20, 194, 200, LV_TEXT_ALIGN_CENTER, false);
     }
     ui_common_footer(screen, footer, false);
     return screen;
