@@ -15,6 +15,7 @@ typedef enum {
     ESPNOW_MSG_RPS_ACCEPT,
     ESPNOW_MSG_RPS_REJECT,
     ESPNOW_MSG_RPS_CHOICE,
+    ESPNOW_MSG_RPS_CHOICE_ACK,
     ESPNOW_MSG_RPS_CANCEL,
     /* Dual-stack "find sibling" ring. Carries a 32-bit ts in session(low) + reserved(high)
      * so the receiver can de-duplicate against the MQTT copy of the same ring. */
