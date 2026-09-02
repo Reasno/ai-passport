@@ -297,12 +297,12 @@ void buzzer_game_service_on_packet(const uint8_t src[6], const espnow_game_packe
             /* Same deterministic role rule as RPS: larger configured ID remains inviter/Host. */
             if (strcmp(CONFIG_KIDS_DEVICE_ID, CONFIG_KIDS_PEER_DEVICE_ID) < 0) {
                 s_game.session = p->session; reset_round(false);
-                s_game.state = BUZZER_STATE_INVITE_RECEIVED; set_status("收到三灯抢答邀请");
+                s_game.state = BUZZER_STATE_INVITE_RECEIVED; set_status("收到抢答器邀请");
                 s_deadline = now + INVITE_TIMEOUT_MS; changed = true;
             }
         } else if (s_game.state == BUZZER_STATE_IDLE || s_game.state == BUZZER_STATE_RESULT) {
             s_game.session = p->session; reset_round(false);
-            s_game.state = BUZZER_STATE_INVITE_RECEIVED; set_status("收到三灯抢答邀请");
+            s_game.state = BUZZER_STATE_INVITE_RECEIVED; set_status("收到抢答器邀请");
             s_deadline = now + INVITE_TIMEOUT_MS; changed = true;
         } else if (!s_game.is_host && p->session == s_game.session && s_game.state >= BUZZER_STATE_SYNCING) {
             espnow_service_send(ESPNOW_MSG_BUZZER_ACCEPT, s_game.session, 0, 0, 0, false);

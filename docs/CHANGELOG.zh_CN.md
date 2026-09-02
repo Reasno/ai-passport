@@ -50,7 +50,7 @@
 - 同步更新索引：`docs/software-design/README.md`、`README.en_US.md` / `README.zh_CN.md` 的 `docs/` 目录说明。
 - 参考 cindy 仓库文档组织完善索引：新增 `docs/README.md` 根总索引；AGENTS.md 规则索引按触发场景改写（附触发条件）；`docs/contribution/` 与 `docs/development/` 的 README 补充收录标准。
 - 引入社区治理文档（参照 cindy 改写，放仓库根目录）：新增 `CONTRIBUTING.md` / `.zh_CN.md`（贡献指南，针对 ESP-IDF/AI agent/fork 场景改写）、`CODE_OF_CONDUCT.md` / `.zh_CN.md`（贡献者公约）、`SECURITY.md` / `.zh_CN.md`（安全报告流程）、`SUPPORT.md` / `.zh_CN.md`（支持渠道）；AGENTS.md 与 docs/README.md 同步引用。
-- 新增两台 AI Passport 的“三灯抢答”游戏：复用 ESP-NOW 配对/邀请模式，通过 NTP-like 时钟偏移采样、Host 绝对时间线、按键按下时间戳和带 ACK 的 Host 裁决，实现三灯倒计时、Host 随机 GO 延迟、抢跑判负、平局与超时处理，且不联动积分；串口截图新增无 ESP-NOW 副作用的 `BUZZER`、`BUZZER_ARMED`、`BUZZER_GO` 和 `BUZZER_RESULT` 调试预览。
+- 新增两台 AI Passport 的“抢答器”游戏：复用 ESP-NOW 配对/邀请模式，通过 NTP-like 时钟偏移采样、Host 绝对时间线、按键按下时间戳和带 ACK 的 Host 裁决，实现三灯倒计时、Host 随机 GO 延迟、抢跑判负、平局与超时处理，且不联动积分；串口截图新增无 ESP-NOW 副作用的 `BUZZER`、`BUZZER_ARMED`、`BUZZER_GO` 和 `BUZZER_RESULT` 调试预览。
 - 找兄弟姐妹入口页 footer 显示长按 B1 主页、长按 B2 对讲和 B3 响铃，同时保留发起方等待页的 B3 取消提示；石头剪刀布结果页明确显示长按 B1 主页和 B3 再来一局，并改为长按 B1 才返回主页。
 - 将小程序 BLE 安装兼容提升为二创模板强制契约：固定保护 `cardid`/Recovery 分区，
   保留上键持续 5 秒进入 Recovery 的 bootloader hook，并在 CI 强制校验合并镜像结构、
