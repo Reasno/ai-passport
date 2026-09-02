@@ -1,5 +1,5 @@
 file(GLOB GENERIC_ICON_SRCS "assets/icons/*.c")
-file(GLOB LOGO_RGB565_SRCS "assets/logo_rgb565/*.c")
+file(GLOB LOGO_ARGB8888_SRCS "assets/logo_argb8888/*.c")
 
 idf_component_register(
     SRCS "main.c"
@@ -29,7 +29,7 @@ idf_component_register(
          "assets/avatar_sister.c"
          "assets/lottery_assets.c"
          ${GENERIC_ICON_SRCS}
-         ${LOGO_RGB565_SRCS}
+         ${LOGO_ARGB8888_SRCS}
          "sound/sound_service.c"
          "fonts/lv_font_noto_sc_14.c"
          "fonts/lv_font_noto_sc_18.c"

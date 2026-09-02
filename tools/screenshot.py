@@ -104,7 +104,8 @@ def main():
     parser.add_argument("--baud", type=int, default=115200, help="ignored by native USB but required by pyserial")
     parser.add_argument("--output", type=Path, default=Path("screenshot.png"))
     parser.add_argument("--timeout", type=float, default=15.0)
-    parser.add_argument("--page", choices=("HOME", "TASKS", "REDEEM", "LOTTERY", "GAMES", "FIND", "RPS"),
+    parser.add_argument("--page", choices=("HOME", "TASKS", "REDEEM", "LOTTERY", "GAMES", "FIND", "RPS",
+                                 "LOTTERY_SPIN", "LOTTERY_RESULT"),
                         help="switch to a side-effect-free debug preview before capture")
     parser.add_argument("--settle-ms", type=int, default=300, help="delay after PAGE acknowledgement")
     args = parser.parse_args()
