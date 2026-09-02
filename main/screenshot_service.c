@@ -1,4 +1,5 @@
 #include "screenshot_service.h"
+#include "mqtt_service.h"
 
 #if CONFIG_ENABLE_SCREENSHOT
 
@@ -134,6 +135,14 @@ static void screenshot_task(void *arg)
             continue;
         }
         command[strcspn(command, "\r\n")] = '\0';
+        if (strncmp(command, "REDEEM ", 7) == 0) {
+            bool sent = mqtt_service_publish_redeem(command + 7);
+            char response[64];
+            int length = snprintf(response, sizeof(response), sent ? "KP_REDEEM_OK %s\n" : "KP_REDEEM_ERR %s\n", command + 7);
+            write_all(response, (size_t)length);
+            fsync(STDOUT_FILENO);
+            continue;
+        }
         if (strncmp(command, "PAGE ", 5) == 0) {
             post_page_command(command + 5);
             continue;

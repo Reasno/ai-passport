@@ -36,6 +36,7 @@ static bool s_suppress_wake_key;
 typedef enum { DEBUG_LOTTERY_IDLE, DEBUG_LOTTERY_SPIN, DEBUG_LOTTERY_RESULT } debug_lottery_t;
 static bool s_debug_preview;
 static debug_lottery_t s_debug_lottery;
+static int s_debug_prize_index;
 #endif
 static bool s_find_waiting, s_find_ringing, s_find_flash, s_ignore_key_until_release, s_ignore_ring_click;
 static int64_t s_find_deadline, s_find_ring_deadline, s_find_next_flash;
@@ -63,10 +64,13 @@ static void render(void)
         game->rssi = -54;
         game->distance_bars = 4;
     } else if (s_debug_preview && s_page == PAGE_LOTTERY && s_debug_lottery == DEBUG_LOTTERY_RESULT) {
+        /* Each LOTTERY_RESULT request steps to the next prize so a capture run covers
+         * every image plus both hint variants. */
         model->lottery_ready = true;
-        model->lottery_points_delta = 10;
-        strlcpy(model->lottery_prize_id, "points10", sizeof(model->lottery_prize_id));
-        strlcpy(model->lottery_label, "积分x10", sizeof(model->lottery_label));
+        model->lottery_points_delta = 0;
+        strlcpy(model->lottery_prize_id, lottery_prize_id_at(s_debug_prize_index),
+                sizeof(model->lottery_prize_id));
+        model->lottery_label[0] = 0;
     } else if (s_debug_preview && s_page == PAGE_RPS) {
         game->state = GAME_STATE_WAITING_CHOICE;
         game->seconds_left = 10;
@@ -187,6 +191,9 @@ static void show_debug_page(app_debug_page_t target)
     else s_find_status[0] = 0;
     ESP_LOGI(TAG, "debug页面=%d", target);
     render();
+    if (s_debug_lottery == DEBUG_LOTTERY_RESULT) {
+        s_debug_prize_index = (s_debug_prize_index + 1) % LOTTERY_PRIZE_COUNT;
+    }
 }
 #endif
 static void process_event(const app_event_t *event)
@@ -268,7 +275,10 @@ static void process_event(const app_event_t *event)
         sound_service_play(SOUND_TICK);
         render();
         if (bsp_lvgl_lock(100)) {
-            ui_lottery_start_spin(lottery_asset_index_for_reward(model->lottery_prize_id));
+            int sector = lottery_sector_for_reward(model->lottery_prize_id);
+            ESP_LOGI(TAG, "抽奖动画 prize=%s sector=%d known=%d", model->lottery_prize_id, sector,
+                     lottery_asset_index_for_reward(model->lottery_prize_id) >= 0);
+            ui_lottery_start_spin(sector);
             bsp_lvgl_unlock();
         }
     } else if (event->type == APP_EVT_GAME_UPDATE) {
