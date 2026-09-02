@@ -356,5 +356,5 @@ static void ui_task(void *arg)
         if (s_message[0] && now >= s_message_until) { s_message[0] = 0; render(); }
     }
 }
-esp_err_t ui_app_start(void) { return xTaskCreatePinnedToCore(ui_task, "kp_ui", 4096, NULL, 3, NULL, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM; }
+esp_err_t ui_app_start(void) { return xTaskCreatePinnedToCore(ui_task, "kp_ui", 8192, NULL, 3, NULL, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM; }
 void ui_app_post_key(bsp_btn_t btn, bsp_btn_ev_t event) { app_event_post(&(app_event_t){.type = APP_EVT_KEY, .button = btn, .button_event = event}, 0); }
