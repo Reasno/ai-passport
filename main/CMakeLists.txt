@@ -12,6 +12,7 @@ idf_component_register(
          "battery_service.c"
          "screenshot_service.c"
          "interaction/espnow_service.c"
+         "interaction/find_service.c"
          "interaction/game_service.c"
          "interaction/ptt_service.c"
          "ui/ui_app.c"

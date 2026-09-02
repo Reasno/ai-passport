@@ -137,13 +137,19 @@ void ui_common_message(lv_obj_t *screen, const char *text, bool error)
     lv_obj_update_layout(box);
     lv_obj_align(box, LV_ALIGN_BOTTOM_MID, 0, -40);
 }
-void ui_common_find_overlay(lv_obj_t *screen, bool bright)
+void ui_common_find_overlay_tint(lv_obj_t *box, bool bright)
+{
+    lv_obj_set_style_bg_color(box, lv_color_hex(bright ? 0x713C18 : 0x402511), 0);
+}
+
+lv_obj_t *ui_common_find_overlay(lv_obj_t *screen, bool bright)
 {
     lv_obj_t *box = ui_common_card(screen, 12, 84, 216, 132, false, true);
-    lv_obj_set_style_bg_color(box, lv_color_hex(bright ? 0x713C18 : 0x402511), 0);
+    ui_common_find_overlay_tint(box, bright);
     lv_obj_set_style_border_width(box, 3, 0);
     lv_obj_set_style_border_color(box, lv_color_hex(KP_YELLOW), 0);
     ui_radar_icon_create(box, 88, 8, KP_YELLOW, 3);
     ui_common_label(box, KP_PEER_LABEL "正在找你！", 8, 56, 192, LV_TEXT_ALIGN_CENTER, true);
-    ui_common_label(box, "按任意键停止\n并回应", 8, 82, 192, LV_TEXT_ALIGN_CENTER, false);
+    ui_common_label_small(box, "按任意键停止\n并回应", 8, 82, 192, LV_TEXT_ALIGN_CENTER);
+    return box;
 }

@@ -16,6 +16,10 @@ typedef enum {
     ESPNOW_MSG_RPS_REJECT,
     ESPNOW_MSG_RPS_CHOICE,
     ESPNOW_MSG_RPS_CANCEL,
+    /* Dual-stack "find sibling" ring. Carries a 32-bit ts in session(low) + reserved(high)
+     * so the receiver can de-duplicate against the MQTT copy of the same ring. */
+    ESPNOW_MSG_FIND_RING,
+    ESPNOW_MSG_FIND_ACK,
 } espnow_msg_type_t;
 
 typedef struct __attribute__((packed)) {
@@ -42,4 +46,11 @@ esp_err_t espnow_service_clear_peer(void);
 esp_err_t espnow_service_store_peer(const uint8_t mac[6]);
 esp_err_t espnow_service_send(espnow_msg_type_t type, uint16_t session, uint16_t sequence,
                               uint8_t choice, int8_t value, bool broadcast);
+/** Send a find ring/ack carrying a 32-bit idempotency token split across session/reserved. */
+esp_err_t espnow_service_send_find(espnow_msg_type_t type, uint32_t ts);
 esp_err_t espnow_service_send_raw_to_peer(const void *data, size_t len);
+/** Recover the 32-bit find token from a received packet. */
+static inline uint32_t espnow_find_ts(const espnow_game_packet_t *p)
+{
+    return ((uint32_t)p->reserved << 16) | (uint32_t)p->session;
+}

@@ -1,4 +1,5 @@
 #include "ui_games.h"
+#include "find_service.h"
 #include "ptt_service.h"
 #include "ui_common.h"
 #include "ui_pixel_icons.h"
@@ -6,6 +7,7 @@
 #include "esp_system.h"
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #define RPS_ART_WIDTH 54
 #define RPS_ART_HEIGHT 72
@@ -66,8 +68,12 @@ lv_obj_t *ui_games_build(const app_model_snapshot_t *model, const game_snapshot_
     lv_obj_t *screen = ui_common_screen("互动游戏", model);
     const char *pair = game->paired ? "已配对 长按B3重配" : "未配对 长按B3配对";
     ui_common_label_small(screen, pair, 12, 31, 216, LV_TEXT_ALIGN_CENTER);
-    game_card(screen, 52, selected == 0, game_service_heap_allows_radar() && game->paired,
-              UI_PIXEL_ICON_RADAR, "找" KP_PEER_LABEL, game->paired ? "响铃和近距离信号" : "请先完成配对");
+    /* Ring works over either transport, so the entry only needs one of them alive. */
+    bool find_ready = game->paired || model->mqtt_online;
+    const char *find_detail = game->paired ? "响铃和近距离信号"
+                              : model->mqtt_online ? "仅WiFi响铃 无测距" : "请先完成配对";
+    game_card(screen, 52, selected == 0, game_service_heap_allows_radar() && find_ready,
+              UI_PIXEL_ICON_RADAR, "找" KP_PEER_LABEL, find_detail);
     game_card(screen, 126, selected == 1, game_service_heap_allows_rps() && game->paired,
               UI_PIXEL_ICON_RPS, "石头剪刀布", game->paired ? "纯娱乐 不增减积分" : "请先完成配对");
     char heap[48]; snprintf(heap, sizeof(heap), "可用内存 %lu KB", (unsigned long)(esp_get_free_heap_size() / 1024));
@@ -94,11 +100,17 @@ lv_obj_t *ui_find_build(const app_model_snapshot_t *model, const game_snapshot_t
         lv_obj_set_size(bar, 18, 10 + i * 5); lv_obj_set_style_border_width(bar, 0, 0);
         lv_obj_set_style_radius(bar, 3, 0); lv_obj_set_style_bg_color(bar, lv_color_hex(i < game->distance_bars ? KP_GREEN : KP_CARD), 0);
     }
-    const char *status = find_status && find_status[0] ? find_status : (model->mqtt_online ? "可让" KP_PEER_LABEL "响铃" : "MQTT离线\n响铃不可用");
-    lv_obj_t *s = ui_common_label_small(screen, status, 12, 213, 216, LV_TEXT_ALIGN_CENTER);
-    lv_obj_set_style_text_color(s, lv_color_hex(waiting ? KP_YELLOW : (model->mqtt_online ? KP_MUTED_LIGHT : KP_RED)), 0);
+    /* Status sits in a two-line box ending at y=234, clearing the PTT hint below it. */
+    find_channels_t live = find_service_available();
+    bool can_ring = live.mqtt || live.espnow;
+    char ready[80];
+    if (can_ring) snprintf(ready, sizeof(ready), "可让" KP_PEER_LABEL "响铃 (%s)", find_service_channel_label(live));
+    else strlcpy(ready, "暂无可用通道\n请先配对或联网", sizeof(ready));
+    const char *status = find_status && find_status[0] ? find_status : ready;
+    lv_obj_t *s = ui_common_label_small(screen, status, 12, 198, 216, LV_TEXT_ALIGN_CENTER);
+    lv_obj_set_style_text_color(s, lv_color_hex(waiting ? KP_YELLOW : (can_ring ? KP_MUTED_LIGHT : KP_RED)), 0);
     bool ptt = ptt_service_available();
-    lv_obj_t *p = ui_common_label_small(screen, ptt ? (ptt_service_is_transmitting() ? "正在说话 松开B2结束" : "长按B2对讲") : "对讲不可用", 12, 234, 216, LV_TEXT_ALIGN_CENTER);
+    lv_obj_t *p = ui_common_label_small(screen, ptt ? (ptt_service_is_transmitting() ? "正在说话 松开B2结束" : "长按B2对讲") : "对讲不可用", 12, 240, 216, LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_text_color(p, lv_color_hex(ptt ? KP_GREEN : KP_MUTED), 0);
     ui_common_footer(screen, "B1 B2选择  B3确认  长按B1主页", false);
     return screen;
