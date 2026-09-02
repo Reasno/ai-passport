@@ -2,6 +2,7 @@
 #include "app_model.h"
 #include "nvs_cache.h"
 #include "battery_service.h"
+#include "buzzer_game_service.h"
 #include "espnow_service.h"
 #include "find_service.h"
 #include "game_service.h"
@@ -48,6 +49,7 @@ void app_main(void)
         esp_err_t now = espnow_service_start();
         if (now == ESP_OK) {
             ESP_ERROR_CHECK_WITHOUT_ABORT(game_service_start());
+            ESP_ERROR_CHECK_WITHOUT_ABORT(buzzer_game_service_start());
             if (audio == ESP_OK) ESP_ERROR_CHECK_WITHOUT_ABORT(ptt_service_start());
             else ESP_LOGW(TAG, "PTT灰化: 音频RX不可用（codec初始化失败）");
         } else ESP_LOGW(TAG, "ESP-NOW互动不可用: %s", esp_err_to_name(now));

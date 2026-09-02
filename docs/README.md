@@ -93,6 +93,19 @@ git switch -c feature/my-passport-app
 
 Example branches may change the same menu, configuration, or driver in incompatible ways. Understand the differences before extracting a state model, asset pipeline, or concurrency pattern. Code appearing in an example branch is not automatically part of the current `main` BSP contract.
 
+## USB screenshot debugging
+
+Screenshot support is disabled by default and is intended only for debugging. Add `CONFIG_ENABLE_SCREENSHOT=y` to the ignored local `sdkconfig.defaults`, rebuild, and use `tools/screenshot.py` over USB Serial/JTAG. The supported `PAGE` names are `HOME`, `TASKS`, `REDEEM`, `LOTTERY`, `GAMES`, `FIND`, `RPS`, `BUZZER`, `BUZZER_ARMED`, `BUZZER_GO`, `BUZZER_RESULT`, `LOTTERY_SPIN`, and `LOTTERY_RESULT`. `BUZZER` aliases the recommended `BUZZER_ARMED` review state with all three red lights visible. Buzzer previews use synthetic snapshots and pause game ticks, so selecting or capturing them sends no ESP-NOW invitation, clock-sync, press, or result traffic.
+
+```bash
+python3 -m pip install pyserial Pillow
+python3 tools/screenshot.py --port /dev/cu.usbmodem1101 --page BUZZER --output buzzer-armed.png
+python3 tools/screenshot.py --port /dev/cu.usbmodem1101 --page BUZZER_GO --output buzzer-go.png
+python3 tools/screenshot.py --port /dev/cu.usbmodem1101 --page BUZZER_RESULT --output buzzer-result.png
+```
+
+A successful page switch returns `KP_PAGE_OK <NAME>`; an unsupported name returns `KP_PAGE_ERR <REASON>`. The host tool waits 300 ms after the page acknowledgement before requesting the screenshot.
+
 ## Project structure
 
 ```text

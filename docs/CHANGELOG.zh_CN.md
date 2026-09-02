@@ -6,6 +6,8 @@
 
 ## Unreleased
 
+- 新增两台 AI Passport 的“三灯抢答”游戏：复用 ESP-NOW 配对/邀请模式，通过 NTP-like 时钟偏移采样、Host 绝对时间线、按键按下时间戳和带 ACK 的 Host 裁决，实现三灯倒计时、Host 随机 GO 延迟、抢跑判负、平局与超时处理，且不联动积分；串口截图新增无 ESP-NOW 副作用的 `BUZZER`、`BUZZER_ARMED`、`BUZZER_GO` 和 `BUZZER_RESULT` 调试预览。
+
 - 找兄弟姐妹入口页 footer 显示长按 B1 主页、长按 B2 对讲和 B3 响铃，同时保留发起方等待页的 B3 取消提示；石头剪刀布结果页明确显示长按 B1 主页和 B3 再来一局，并改为长按 B1 才返回主页。
 - 将小程序 BLE 安装兼容提升为二创模板强制契约：固定保护 `cardid`/Recovery 分区，
   保留上键持续 5 秒进入 Recovery 的 bootloader hook，并在 CI 强制校验合并镜像结构、

@@ -103,12 +103,15 @@ CONFIG_KP_CHILD_ROLE="哥哥"
 
 ## USB 截图调试
 
-截图功能默认关闭，仅用于调试。把 `CONFIG_ENABLE_SCREENSHOT=y` 写入已忽略的本机 `sdkconfig.defaults` 后重新构建；设备通过 USB Serial/JTAG 收到 `SCREENSHOT\n` 时，会强制 LVGL 完整刷新，并复用现有 240×20 RGB565 DMA 绘制缓冲逐块输出，不申请 240×320 全屏缓冲。可先发送 `PAGE HOME|TASKS|REDEEM|LOTTERY|GAMES|FIND|RPS\n` 切换调试预览页；串口任务只投递 `APP_EVT_DEBUG_PAGE`，由 UI 任务构建页面。LOTTERY、FIND、RPS 预览不会发起 MQTT 响铃、兑换或 ESP-NOW 邀请。
+截图功能默认关闭，仅用于调试。把 `CONFIG_ENABLE_SCREENSHOT=y` 写入已忽略的本机 `sdkconfig.defaults` 后重新构建；设备通过 USB Serial/JTAG 收到 `SCREENSHOT\n` 时，会强制 LVGL 完整刷新，并复用现有 240×20 RGB565 DMA 绘制缓冲逐块输出，不申请 240×320 全屏缓冲。可先发送 `PAGE HOME|TASKS|REDEEM|LOTTERY|GAMES|FIND|RPS|BUZZER|BUZZER_ARMED|BUZZER_GO|BUZZER_RESULT|LOTTERY_SPIN|LOTTERY_RESULT\n` 切换调试预览页；串口任务只投递 `APP_EVT_DEBUG_PAGE`，由 UI 任务使用合成 snapshot 构建页面。`BUZZER` 是 `BUZZER_ARMED` 的别名，显示三盏红灯全亮的典型评审状态；所有抢答预览均暂停游戏 tick，不发起 ESP-NOW 邀请、同步、按键或结果消息。LOTTERY、FIND、RPS 预览同样不会发起 MQTT 响铃、兑换或 ESP-NOW 邀请。
 
 ```bash
 python3 -m pip install pyserial Pillow
 python3 tools/screenshot.py --port /dev/cu.usbmodem1101 --page HOME --output home.png
 python3 tools/screenshot.py --port /dev/cu.usbmodem1101 --page LOTTERY --output lottery.png
+python3 tools/screenshot.py --port /dev/cu.usbmodem1101 --page BUZZER --output buzzer-armed.png
+python3 tools/screenshot.py --port /dev/cu.usbmodem1101 --page BUZZER_GO --output buzzer-go.png
+python3 tools/screenshot.py --port /dev/cu.usbmodem1101 --page BUZZER_RESULT --output buzzer-result.png
 ```
 
 `PAGE` 成功返回 `KP_PAGE_OK <NAME>`，失败返回 `KP_PAGE_ERR <REASON>`；主机工具默认等待 300ms 后再发送 `SCREENSHOT`。帧协议为 `KPSS2 240 320 RGB565LE KPRC\n`。每条记录为 little-endian `{char magic[4]="KPRC"; uint16 x1,y1,x2,y2; uint32 len}`、`len` 字节 RGB565LE 像素和 `uint32 record_crc32`；记录 CRC 覆盖记录头及像素。帧尾为 `KPSS_END <frame_crc32> <pixel_count>\n`，frame CRC 覆盖全部记录头及像素，不含逐记录 CRC。主机端扫描 `KPRC` 并校验坐标、长度和 CRC，因此可跳过普通串口日志或损坏记录并重新同步；二进制传输期间固件也会临时关闭 ESP 日志并强制 LF，结束后恢复。

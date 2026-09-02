@@ -21,6 +21,19 @@ typedef enum {
      * so the receiver can de-duplicate against the MQTT copy of the same ring. */
     ESPNOW_MSG_FIND_RING,
     ESPNOW_MSG_FIND_ACK,
+    ESPNOW_MSG_BUZZER_INVITE,
+    ESPNOW_MSG_BUZZER_ACCEPT,
+    ESPNOW_MSG_BUZZER_REJECT,
+    ESPNOW_MSG_BUZZER_SYNC_REQ,
+    ESPNOW_MSG_BUZZER_SYNC_RESP,
+    ESPNOW_MSG_BUZZER_SYNC_SET,
+    ESPNOW_MSG_BUZZER_START,
+    ESPNOW_MSG_BUZZER_START_ACK,
+    ESPNOW_MSG_BUZZER_PRESS,
+    ESPNOW_MSG_BUZZER_PRESS_ACK,
+    ESPNOW_MSG_BUZZER_RESULT,
+    ESPNOW_MSG_BUZZER_RESULT_ACK,
+    ESPNOW_MSG_BUZZER_CANCEL,
 } espnow_msg_type_t;
 
 typedef struct __attribute__((packed)) {
@@ -47,6 +60,9 @@ esp_err_t espnow_service_clear_peer(void);
 esp_err_t espnow_service_store_peer(const uint8_t mac[6]);
 esp_err_t espnow_service_send(espnow_msg_type_t type, uint16_t session, uint16_t sequence,
                               uint8_t choice, int8_t value, bool broadcast);
+/** Send a 32-bit protocol value using the packet choice/value/reserved payload bytes. */
+esp_err_t espnow_service_send_data(espnow_msg_type_t type, uint16_t session,
+                                   uint16_t sequence, uint32_t data);
 /** Send a find ring/ack carrying a 32-bit idempotency token split across session/reserved. */
 esp_err_t espnow_service_send_find(espnow_msg_type_t type, uint32_t ts);
 esp_err_t espnow_service_send_raw_to_peer(const void *data, size_t len);

@@ -1,6 +1,7 @@
 #include "ui_app.h"
 #include "app_events.h"
 #include "app_model.h"
+#include "buzzer_game_service.h"
 #include "find_service.h"
 #include "game_service.h"
 #include "mqtt_service.h"
@@ -25,7 +26,7 @@
 #include <stdio.h>
 #include <string.h>
 
-typedef enum { PAGE_HOME, PAGE_TASKS, PAGE_CONFIRM, PAGE_REDEEM, PAGE_LOTTERY, PAGE_GAMES, PAGE_FIND, PAGE_RPS } page_t;
+typedef enum { PAGE_HOME, PAGE_TASKS, PAGE_CONFIRM, PAGE_REDEEM, PAGE_LOTTERY, PAGE_GAMES, PAGE_FIND, PAGE_RPS, PAGE_BUZZER } page_t;
 static const char *TAG = "kp_ui";
 static page_t s_page = PAGE_HOME, s_confirm_return = PAGE_HOME;
 static int s_selected; static confirm_kind_t s_confirm_kind;
@@ -33,10 +34,13 @@ static char s_confirm_id[APP_ID_LEN], s_confirm_name[APP_NAME_LEN]; static int s
 static char s_message[128]; static bool s_message_error; static int64_t s_message_until;
 static int s_lottery_rotation; static bool s_lottery_animating; static int64_t s_lottery_reveal_at;
 static bool s_suppress_wake_key;
+static bool s_buzzer_press_consumed;
 #if CONFIG_ENABLE_SCREENSHOT
 typedef enum { DEBUG_LOTTERY_IDLE, DEBUG_LOTTERY_SPIN, DEBUG_LOTTERY_RESULT } debug_lottery_t;
+typedef enum { DEBUG_BUZZER_NONE, DEBUG_BUZZER_ARMED, DEBUG_BUZZER_GO, DEBUG_BUZZER_RESULT } debug_buzzer_t;
 static bool s_debug_preview;
 static debug_lottery_t s_debug_lottery;
+static debug_buzzer_t s_debug_buzzer;
 static int s_debug_prize_index;
 #endif
 static bool s_find_waiting, s_find_ringing, s_find_flash, s_ignore_key_until_release, s_ignore_ring_click;
@@ -46,9 +50,11 @@ static char s_find_status[64], s_find_sender[64];
 /* Large cross-module snapshots are static to preserve the measured-safe 4 KB UI stack. */
 static app_model_snapshot_t s_ui_model;
 static game_snapshot_t s_game;
+static buzzer_game_snapshot_t s_buzzer;
 
 static app_model_snapshot_t *model_snapshot(void) { app_model_snapshot(&s_ui_model); return &s_ui_model; }
 static game_snapshot_t *game_snapshot(void) { game_service_snapshot(&s_game); return &s_game; }
+static buzzer_game_snapshot_t *buzzer_snapshot(void) { buzzer_game_service_snapshot(&s_buzzer); return &s_buzzer; }
 static void set_message(const char *text, bool error)
 {
     ui_text_limit_lines(text, s_message, sizeof(s_message), UI_TEXT_STANDARD_MAX_CHARS);
@@ -59,6 +65,7 @@ static void render(void)
 {
     app_model_snapshot_t *model = model_snapshot();
     game_snapshot_t *game = game_snapshot();
+    buzzer_game_snapshot_t *buzzer = buzzer_snapshot();
 #if CONFIG_ENABLE_SCREENSHOT
     /* Preview-only snapshots never mutate ESP-NOW, MQTT, pairing, radar or RPS state. */
     if (s_debug_preview && s_page == PAGE_FIND) {
@@ -78,6 +85,25 @@ static void render(void)
         game->state = GAME_STATE_WAITING_CHOICE;
         game->seconds_left = 10;
         strlcpy(game->status, "请选择出拳", sizeof(game->status));
+    } else if (s_debug_preview && s_page == PAGE_BUZZER) {
+        memset(buzzer, 0, sizeof(*buzzer));
+        buzzer->paired = true;
+        buzzer->is_host = true;
+        if (s_debug_buzzer == DEBUG_BUZZER_GO) {
+            buzzer->state = BUZZER_STATE_GO;
+            buzzer->lights_on = 0;
+            strlcpy(buzzer->status, "GO！快按 B3", sizeof(buzzer->status));
+        } else if (s_debug_buzzer == DEBUG_BUZZER_RESULT) {
+            buzzer->state = BUZZER_STATE_RESULT;
+            buzzer->result = BUZZER_RESULT_WIN;
+            buzzer->local_pressed = true;
+            strlcpy(buzzer->status, "你赢了！", sizeof(buzzer->status));
+        } else {
+            /* BUZZER is an alias of the most useful full-page review state. */
+            buzzer->state = BUZZER_STATE_ARMED;
+            buzzer->lights_on = 3;
+            strlcpy(buzzer->status, "准备，别抢跑", sizeof(buzzer->status));
+        }
     }
 #endif
     if (!bsp_lvgl_lock(1000)) return;
@@ -95,7 +121,8 @@ static void render(void)
                                                                );
     else if (s_page == PAGE_GAMES) screen = ui_games_build(model, game, s_selected);
     else if (s_page == PAGE_FIND) screen = ui_find_build(model, game, s_find_status, s_find_waiting);
-    else screen = ui_rps_build(model, game);
+    else if (s_page == PAGE_RPS) screen = ui_rps_build(model, game);
+    else screen = ui_buzzer_build(model, buzzer);
     if (s_message[0] && esp_timer_get_time() / 1000 < s_message_until) ui_common_message(screen, s_message, s_message_error);
     if (s_find_ringing) s_find_overlay = ui_common_find_overlay(screen, s_find_flash);
     else s_find_overlay = NULL;
@@ -127,7 +154,8 @@ static void begin_confirm(confirm_kind_t kind, page_t back, const char *id, cons
 static void handle_short_key(bsp_btn_t key)
 {
     app_model_snapshot_t *model = model_snapshot(); game_snapshot_t *game = game_snapshot();
-    if (model->pending_type != APP_PENDING_NONE && s_page != PAGE_LOTTERY && s_page != PAGE_GAMES && s_page != PAGE_FIND && s_page != PAGE_RPS) return;
+    buzzer_game_snapshot_t *buzzer = buzzer_snapshot();
+    if (model->pending_type != APP_PENDING_NONE && s_page != PAGE_LOTTERY && s_page != PAGE_GAMES && s_page != PAGE_FIND && s_page != PAGE_RPS && s_page != PAGE_BUZZER) return;
     int delta = key == BSP_BTN_UP ? -1 : 1;
     if (s_page == PAGE_HOME) {
         if (key != BSP_BTN_OK) key_move(delta, 3);
@@ -155,14 +183,16 @@ static void handle_short_key(bsp_btn_t key)
             else { set_message("无法提交\n请检查网络后重试", true); sound_service_play(SOUND_DU); render(); } }
     } else if (s_page == PAGE_LOTTERY && model->lottery_ready && !s_lottery_animating && key == BSP_BTN_OK) go(PAGE_REDEEM, 1);
     else if (s_page == PAGE_GAMES) {
-        if (key != BSP_BTN_OK) key_move(delta, 2);
-        /* Find only needs one live transport; RPS and the RSSI radar still require pairing. */
+        if (key != BSP_BTN_OK) key_move(delta, 3);
+        /* Find only needs one live transport; both competitive games require pairing. */
         else if (s_selected == 0) {
             if (!game->paired && !model->mqtt_online) { set_message("请长按B3先配对", false); render(); }
             else if (!game_service_heap_allows_radar()) { set_message("内存不足\n找" KP_PEER_LABEL "暂不可用", true); render(); }
             else { game_service_set_radar(true); s_find_status[0] = 0; s_find_waiting = false; go(PAGE_FIND, 0); }
         } else if (!game->paired) { set_message("请长按B3先配对", false); render(); }
-        else { if (!game_service_heap_allows_rps()) { set_message("内存不足，对战不可用", true); render(); } else { game_service_invite_rps(); go(PAGE_RPS, 0); } }
+        else if (!game_service_heap_allows_rps()) { set_message("内存不足，对战不可用", true); render(); }
+        else if (s_selected == 1) { game_service_invite_rps(); go(PAGE_RPS, 0); }
+        else { buzzer_game_service_invite(); go(PAGE_BUZZER, 0); }
     } else if (s_page == PAGE_FIND && key == BSP_BTN_OK) {
         /* Both transports fire together: MQTT when online (so HA sees it) plus an
          * unconditional ESP-NOW copy, which is the only path when we are away from home. */
@@ -187,6 +217,15 @@ static void handle_short_key(bsp_btn_t key)
         }
         else if (game->state == GAME_STATE_RESULT && key == BSP_BTN_OK) game_service_invite_rps();
         else if (game->state == GAME_STATE_IDLE && key == BSP_BTN_OK) go(PAGE_GAMES, 1);
+    } else if (s_page == PAGE_BUZZER) {
+        if (buzzer->state == BUZZER_STATE_INVITE_RECEIVED) {
+            if (key == BSP_BTN_OK) buzzer_game_service_respond_invite(true);
+            else if (key == BSP_BTN_DOWN) { buzzer_game_service_respond_invite(false); go(PAGE_GAMES, 2); }
+        } else if (buzzer->state == BUZZER_STATE_RESULT && key == BSP_BTN_OK) {
+            buzzer_game_service_invite();
+        } else if (buzzer->state == BUZZER_STATE_IDLE && key == BSP_BTN_OK) {
+            go(PAGE_GAMES, 2);
+        }
     }
 }
 #if CONFIG_ENABLE_SCREENSHOT
@@ -194,6 +233,7 @@ static void show_debug_page(app_debug_page_t target)
 {
     static const page_t pages[APP_DEBUG_PAGE_COUNT] = {
         PAGE_HOME, PAGE_TASKS, PAGE_REDEEM, PAGE_LOTTERY, PAGE_GAMES, PAGE_FIND, PAGE_RPS,
+        PAGE_BUZZER, PAGE_BUZZER, PAGE_BUZZER, PAGE_BUZZER,
         PAGE_LOTTERY, PAGE_LOTTERY,
     };
     if (target < 0 || target >= APP_DEBUG_PAGE_COUNT) return;
@@ -201,6 +241,10 @@ static void show_debug_page(app_debug_page_t target)
     s_debug_lottery = target == APP_DEBUG_PAGE_LOTTERY_SPIN ? DEBUG_LOTTERY_SPIN
                     : target == APP_DEBUG_PAGE_LOTTERY_RESULT ? DEBUG_LOTTERY_RESULT
                     : DEBUG_LOTTERY_IDLE;
+    s_debug_buzzer = target == APP_DEBUG_PAGE_BUZZER_GO ? DEBUG_BUZZER_GO
+                   : target == APP_DEBUG_PAGE_BUZZER_RESULT ? DEBUG_BUZZER_RESULT
+                   : (target == APP_DEBUG_PAGE_BUZZER || target == APP_DEBUG_PAGE_BUZZER_ARMED)
+                         ? DEBUG_BUZZER_ARMED : DEBUG_BUZZER_NONE;
     s_page = pages[target];
     s_selected = 0;
     s_message[0] = 0;
@@ -251,6 +295,21 @@ static void process_event(const app_event_t *event)
             if (event->button_event == BSP_BTN_CLICK || event->button_event == BSP_BTN_LONG || event->button_event == BSP_BTN_RELEASE) s_suppress_wake_key = false;
             return;
         }
+        /* B3 PRESS carries the ISR-adjacent monotonic timestamp. Consume the later CLICK so
+         * queue latency and the button library's click recognition cannot affect arbitration. */
+        if (s_page == PAGE_BUZZER && event->button == BSP_BTN_OK && event->button_event == BSP_BTN_PRESS) {
+            buzzer_game_snapshot_t *buzzer = buzzer_snapshot();
+            if (buzzer->state == BUZZER_STATE_ARMED || buzzer->state == BUZZER_STATE_GO) {
+                buzzer_game_service_press(event->timestamp_ms);
+                s_buzzer_press_consumed = true;
+                return;
+            }
+        }
+        if (s_page == PAGE_BUZZER && event->button == BSP_BTN_OK &&
+            event->button_event == BSP_BTN_CLICK && s_buzzer_press_consumed) {
+            s_buzzer_press_consumed = false;
+            return;
+        }
         if (event->button_event == BSP_BTN_LONG && event->button == BSP_BTN_DOWN && s_page == PAGE_FIND) {
             if (ptt_service_available()) ptt_service_set_transmitting(true);
             else set_message("对讲不可用\n需配对和80KB内存", true);
@@ -263,7 +322,11 @@ static void process_event(const app_event_t *event)
         }
         if (event->button == BSP_BTN_UP && event->button_event == BSP_BTN_LONG) {
             app_model_snapshot_t *model = model_snapshot();
-            if (model->pending_type == APP_PENDING_NONE) { game_service_cancel(); go(PAGE_HOME, 0); }
+            if (model->pending_type == APP_PENDING_NONE) {
+                game_service_cancel();
+                buzzer_game_service_cancel();
+                go(PAGE_HOME, 0);
+            }
             return;
         }
         if (event->button_event == BSP_BTN_CLICK) handle_short_key(event->button);
@@ -304,14 +367,25 @@ static void process_event(const app_event_t *event)
             bsp_lvgl_unlock();
         }
     } else if (event->type == APP_EVT_GAME_UPDATE) {
+#if CONFIG_ENABLE_SCREENSHOT
+        /* Keep a serial PAGE preview deterministic if a stale/live radio event arrives. */
+        if (s_debug_preview) { render(); return; }
+#endif
         game_snapshot_t *game = game_snapshot();
-        if (game->state == GAME_STATE_INVITE_RECEIVED) {
+        buzzer_game_snapshot_t *buzzer = buzzer_snapshot();
+        if (buzzer->state == BUZZER_STATE_INVITE_RECEIVED) {
+            s_page = PAGE_BUZZER;
+            render();
+        } else if (game->state == GAME_STATE_INVITE_RECEIVED) {
             /* Entering the page is not enough: the current LVGL tree still belongs
              * to the previous page until it is explicitly rebuilt. */
             s_page = PAGE_RPS;
             render();
         } else if (s_page == PAGE_RPS && game->state == GAME_STATE_IDLE &&
                    (strcmp(game->status, "对方退出了游戏") == 0 || strcmp(game->status, "邀请已超时") == 0))
+            go(PAGE_HOME, 0);
+        else if (s_page == PAGE_BUZZER && buzzer->state == BUZZER_STATE_IDLE &&
+                 strcmp(buzzer->status, "对方退出了游戏") == 0)
             go(PAGE_HOME, 0);
         else render();
     } else if (event->type == APP_EVT_DATA_ERROR || event->type == APP_EVT_ACTION_TIMEOUT) {
@@ -335,7 +409,20 @@ static void ui_task(void *arg)
             strlcpy(timeout.text, "请求超时，请重试", sizeof(timeout.text));
             process_event(&timeout);
         }
-        if (now >= next_game_tick) { game_service_tick(now); next_game_tick = now + 200; }
+        if (now >= next_game_tick) {
+#if CONFIG_ENABLE_SCREENSHOT
+            /* Debug PAGE previews are pure UI snapshots: do not advance a live game or
+             * originate any retry/timeout ESP-NOW traffic while preview mode is active. */
+            if (!s_debug_preview) {
+                game_service_tick(now);
+                buzzer_game_service_tick(now);
+            }
+#else
+            game_service_tick(now);
+            buzzer_game_service_tick(now);
+#endif
+            next_game_tick = now + 50;
+        }
         find_service_tick(now);
         if (s_find_waiting && now >= s_find_deadline) {
             s_find_waiting = false; s_find_deadline = 0;
@@ -371,4 +458,12 @@ static void ui_task(void *arg)
     }
 }
 esp_err_t ui_app_start(void) { return xTaskCreatePinnedToCore(ui_task, "kp_ui", 8192, NULL, 3, NULL, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM; }
-void ui_app_post_key(bsp_btn_t btn, bsp_btn_ev_t event) { app_event_post(&(app_event_t){.type = APP_EVT_KEY, .button = btn, .button_event = event}, 0); }
+void ui_app_post_key(bsp_btn_t btn, bsp_btn_ev_t event)
+{
+    app_event_post(&(app_event_t){
+        .type = APP_EVT_KEY,
+        .button = btn,
+        .button_event = event,
+        .timestamp_ms = esp_timer_get_time() / 1000,
+    }, 0);
+}
