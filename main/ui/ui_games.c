@@ -157,9 +157,7 @@ lv_obj_t *ui_rps_build(const app_model_snapshot_t *model, const game_snapshot_t 
         /* The centered status already says 即将开始; deliberately show no seconds. */
     } else {
         char left[40];
-        snprintf(left, sizeof(left), "剩余 %lu.%lu 秒",
-                 (unsigned long)(game->tenths_left / 10),
-                 (unsigned long)(game->tenths_left % 10));
+        snprintf(left, sizeof(left), "剩余 %lu 秒", (unsigned long)game->seconds_left);
         ui_common_label(screen, left, 20, 194, 200, LV_TEXT_ALIGN_CENTER, false);
     }
     ui_common_footer(screen, footer, false);

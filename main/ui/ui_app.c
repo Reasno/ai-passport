@@ -77,7 +77,6 @@ static void render(void)
     } else if (s_debug_preview && s_page == PAGE_RPS) {
         game->state = GAME_STATE_WAITING_CHOICE;
         game->seconds_left = 10;
-        game->tenths_left = 100;
         strlcpy(game->status, "请选择出拳", sizeof(game->status));
     }
 #endif
