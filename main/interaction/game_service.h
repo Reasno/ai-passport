@@ -11,7 +11,7 @@ typedef struct {
     game_state_t state; bool paired; bool radar_active; bool peer_nearby;
     int8_t rssi; uint8_t distance_bars; uint16_t session;
     rps_choice_t local_choice, remote_choice, cursor_choice; int8_t result;
-    uint8_t countdown; uint32_t seconds_left; uint16_t tenths_left; char status[64];
+    uint8_t countdown; uint32_t seconds_left; char status[64];
 } game_snapshot_t;
 esp_err_t game_service_start(void);
 void game_service_tick(int64_t now_ms);
