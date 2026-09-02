@@ -140,7 +140,7 @@ static void handle_short_key(bsp_btn_t key)
     } else if (s_page == PAGE_LOTTERY && model->lottery_ready && !s_lottery_animating && key == BSP_BTN_OK) go(PAGE_REDEEM, 1);
     else if (s_page == PAGE_GAMES) {
         if (key != BSP_BTN_OK) key_move(delta, 2);
-        else if (!game->paired) { set_message("请长按中键先配对", false); render(); }
+        else if (!game->paired) { set_message("请长按B3先配对", false); render(); }
         else if (s_selected == 0) { if (!game_service_heap_allows_radar()) { set_message("内存不足\n找伙伴暂不可用", true); render(); } else { game_service_set_radar(true); s_find_status[0] = 0; s_find_waiting = false; go(PAGE_FIND, 0); } }
         else { if (!game_service_heap_allows_rps()) { set_message("内存不足，对战不可用", true); render(); } else { game_service_invite_rps(); go(PAGE_RPS, 0); } }
     } else if (s_page == PAGE_FIND && key == BSP_BTN_OK) {

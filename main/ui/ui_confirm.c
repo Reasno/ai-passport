@@ -24,5 +24,5 @@ lv_obj_t *ui_confirm_build(const app_model_snapshot_t *model, confirm_kind_t kin
         lv_label_set_text(label, buttons[i]);
         lv_obj_align(label, LV_ALIGN_CENTER, 0, -1);
     }
-    ui_common_footer(screen, "上下选择 中键执行 长按上键主页", false); return screen;
+    ui_common_footer(screen, "B1 B2选择  B3确认  长按B1主页", false); return screen;
 }
