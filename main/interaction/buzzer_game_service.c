@@ -3,6 +3,7 @@
 #include "esp_log.h"
 #include "esp_random.h"
 #include "esp_timer.h"
+#include "sound_service.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include <limits.h>
@@ -271,9 +272,21 @@ void buzzer_game_service_tick(int64_t now)
         if (time_reached(host_now, s_plan_base_host + 2 * LIGHT_STEP_MS)) lights = 3;
         if (time_reached(host_now, s_go_host)) {
             lights = 0;
-            if (s_game.state != BUZZER_STATE_GO) { s_game.state = BUZZER_STATE_GO; set_status("GO！快按 B3"); changed = true; }
+            if (s_game.state != BUZZER_STATE_GO) {
+                s_game.state = BUZZER_STATE_GO;
+                set_status("GO！快按 B3");
+                sound_service_play(SOUND_BUZZER_GO);
+                changed = true;
+            }
         }
-        if (lights != s_game.lights_on) { s_game.lights_on = lights; changed = true; }
+        if (lights != s_game.lights_on) {
+            if (lights > s_game.lights_on) {
+                for (uint8_t light = s_game.lights_on; light < lights; ++light)
+                    sound_service_play(SOUND_TICK);
+            }
+            s_game.lights_on = lights;
+            changed = true;
+        }
         if (s_game.is_host && s_first_press_seen && now - s_first_press_seen >= DECISION_GRACE_MS) {
             decide_host(); changed = true;
         } else if (s_game.is_host && now >= s_deadline) { decide_host(); changed = true; }

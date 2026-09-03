@@ -67,6 +67,7 @@ static void sound_task(void *arg)
         else if (effect == SOUND_DING) tone(440, 880, 200, false);
         else if (effect == SOUND_DU) tone(200, 200, 150, true);
         else if (effect == SOUND_FIND_RING) find_ring();
+        else if (effect == SOUND_BUZZER_GO) tone(1600, 1600, 35, true);
         else { tone(523, 523, 150, false); tone(659, 659, 150, false); tone(784, 784, 200, false); }
         sound_service_audio_unlock();
     }

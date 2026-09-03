@@ -6,6 +6,8 @@
 
 ## Unreleased
 
+- 抢答器游戏新增 F1 风格声音倒计时：三盏红灯逐盏亮起时分别发出提示音，全部熄灭进入 GO 时播放更短促、更高频的开始音。
+
 - 将对讲可用的空闲堆内存阈值从 80 KB 下调到 70 KB，使内存较紧张时仍可发起对讲。
 
 - 新增两台 AI Passport 的“抢答器”游戏：复用 ESP-NOW 配对/邀请模式，通过 NTP-like 时钟偏移采样、Host 绝对时间线、按键按下时间戳和带 ACK 的 Host 裁决，实现三灯倒计时、Host 随机 GO 延迟、抢跑判负、平局与超时处理，且不联动积分；串口截图新增无 ESP-NOW 副作用的 `BUZZER`、`BUZZER_ARMED`、`BUZZER_GO` 和 `BUZZER_RESULT` 调试预览。
