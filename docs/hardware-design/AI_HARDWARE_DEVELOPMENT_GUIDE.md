@@ -35,7 +35,7 @@ The target is the ESP32-C3 FoloToy AI Passport with ESP-IDF 5.5.3. It has 8 MB F
 | Audio | ES8311 playback and microphone | shared I2C + I2S0 full duplex | Playback and recording page |
 | Battery | CW2017 fuel gauge | shared I2C0, address `0x63` | Optional SOC and voltage driver |
 | Wi-Fi | 2.4 GHz station | initialized by the demo | Scan page |
-| Bluetooth LE | NimBLE peripheral | initialized by the demo | Non-connectable advertising page |
+| Bluetooth LE | Hardware supported, application stack disabled | Factory Recovery only | Recovery provides the mini-program install service independently |
 | Low power | light/deep sleep | RTC timer wake | 2 s light and 5 s deep-sleep modes |
 | Console | USB Serial/JTAG | native USB GPIO18/19 | Configured |
 
@@ -73,8 +73,8 @@ LCD reset and amplifier enable are `-1`: display reset uses software reset, and 
 | I2S0 | audio BSP | TX and RX are full duplex and share MCLK/BCLK/WS. |
 | USB Serial/JTAG | console configuration | GPIO18/19 are part of the selected console path. |
 | Internal RAM/DMA | display, LVGL, audio, radio, tasks | No PSRAM exists; total free heap and largest contiguous block both matter. |
-| NVS/network event loop | `demo_radio.c` | Prepared once for Wi-Fi/BLE demos; do not erase unrelated NVS data on initialization errors. |
-| Wi-Fi/BLE stacks | individual demo pages | Current demos start on page entry and deinitialize on exit; the stacks do not remain active together. |
+| NVS/network event loop | application services | Shared by Wi-Fi and ESP-NOW; do not erase unrelated NVS data on initialization errors. |
+| Wi-Fi/ESP-NOW stacks | application services | Active connectivity path; Bluetooth host/controller support is excluded from the application build. |
 
 GPIO0 is both the button ADC node and an ESP32-C3 boot-related pin. GPIO21 is the backlight output and conflicts with the commonly used UART0 TX mapping. Pin reassignment requires boot/programming-path review and on-device acceptance.
 
@@ -99,7 +99,7 @@ app_main
 
 Display/LVGL is a hard dependency. Buttons, audio, and battery are soft dependencies whose pages show `[FAIL]` while other pages remain available. Public BSP APIs are under `components/bsp/include/`; most initialization is idempotent, but there is no universal BSP deinitialization API.
 
-Wi-Fi, NimBLE, and sleep use ESP-IDF directly rather than the BSP. `demo_radio.c` owns shared NVS, `esp_netif`, and default-event-loop setup. Wi-Fi and Bluetooth pages allocate their radio stacks on entry and stop/deinitialize them on exit. Do not erase NVS to hide partition errors. Deep sleep restarts the application and the demo uses RTC slow memory for the wake counter.
+Wi-Fi, ESP-NOW, and sleep use ESP-IDF directly rather than the BSP. The application initializes Wi-Fi and ESP-NOW during startup. Bluetooth host/controller support is disabled in the application build; the independent factory Recovery partition still owns the BLE installation service. Do not erase NVS to hide partition errors. Deep sleep restarts the application and the demo uses RTC slow memory for the wake counter.
 
 ## 5. Display and LVGL
 
@@ -234,7 +234,7 @@ General board acceptance:
 | Codec/I2S | 1 kHz tone, non-zero recording, correct playback speed, format changes, page exit |
 | Battery | plausible SOC/mV, graceful missing-device behavior, intermittent-I2C recovery |
 | Wi-Fi | visible scan count/SSID/RSSI, rescan, repeated entry/exit |
-| Bluetooth LE | phone sees `FoloPassport`, restart advertising, advertising stops on exit, repeated entry/exit |
+| Bluetooth LE | confirm `CONFIG_BT_ENABLED` is unset and the application map has no Bluetooth host/controller symbols; separately preserve the Recovery install path |
 | Light/deep sleep | select with UP/DOWN; 2 s light sleep resumes with backlight; 5 s deep sleep restarts with timer cause and retained count |
 | DMA/memory/UI | build memory report, runtime minimum heap/largest block, stable concurrent audio/display |
 
@@ -254,7 +254,7 @@ General board acceptance:
 | Recording is zero | `no_dac_ref`, DIN GPIO4, microphone path, gain |
 | Recording allocation fails | no PSRAM; shorten/stream and inspect largest block |
 | Battery shows `--` | `0x63` response, invalid SOC, profile/startup delay |
-| Wi-Fi/BLE fails on second entry | stack stop/deinit and one-time NVS/event-loop setup |
+| Wi-Fi/ESP-NOW fails after startup | Wi-Fi initialization, channel alignment, NVS, and event-loop setup |
 | Black after light sleep | timer wake source, sleep error, backlight restore |
 | Deep sleep does not restart | timer source, boot wake cause, RTC counter |
 | I2S allocation fails after UI growth | competition among LCD/LVGL buffers and I2S DMA |

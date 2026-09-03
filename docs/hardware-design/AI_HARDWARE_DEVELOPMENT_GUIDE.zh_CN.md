@@ -37,7 +37,7 @@ AI 应先完成以下检查：
 | 音频 | ES8311，播放 + 麦克风录音 | I2C 控制 + I2S0 全双工 | 播放与录音页 |
 | 电池 | CW2017 电量计 | 共享 I2C0，地址 0x63 | 可缺省 SOC/电压驱动 |
 | Wi-Fi | ESP32-C3 2.4 GHz STA | 应用页按需初始化 | 扫描页 |
-| Bluetooth LE | ESP32-C3 NimBLE peripheral | 应用页按需初始化 | 不可连接广播页 |
+| Bluetooth LE | 芯片硬件支持，应用协议栈已禁用 | 仅工厂 Recovery 使用 | Recovery 独立提供小程序安装服务 |
 | 低功耗 | ESP32-C3 light/deep sleep | RTC timer 唤醒 | 2 秒 light sleep 和 5 秒 deep sleep 模式 |
 | 日志 | USB Serial/JTAG | 原生 USB GPIO18/19 | 已配置 |
 
@@ -77,8 +77,8 @@ LCD RST 和功放 PA 使能均定义为 `-1`：LCD 复位使用软件路径，�
 | I2S0 | 音频 BSP | TX/RX 全双工，共用 MCLK/BCLK/WS。 |
 | USB Serial/JTAG | 控制台配置 | GPIO18/19 属于当前控制台路径。 |
 | 内部 RAM/DMA | 显示、LVGL、音频、无线、任务 | 无 PSRAM；总空闲堆和最大连续块都必须检查。 |
-| NVS/网络 event loop | `demo_radio.c` | 为 Wi-Fi/BLE demo 一次性准备；初始化失败时不得擦除无关 NVS 数据。 |
-| Wi-Fi/BLE 协议栈 | 各自 demo 页面 | 当前页面进入时启动、退出时释放，不同时常驻。 |
+| NVS/网络 event loop | 应用服务 | Wi-Fi 与 ESP-NOW 共用；初始化失败时不得擦除无关 NVS 数据。 |
+| Wi-Fi/ESP-NOW 协议栈 | 应用服务 | 当前连接链路；应用构建不包含 Bluetooth host/controller。 |
 
 GPIO0 同时是按键 ADC 节点和 ESP32-C3 启动相关管脚；GPIO21 是背光输出，并与常见 UART0 TX 映射冲突。重分配引脚必须复核启动/烧录路径并完成实机验收。
 
@@ -103,9 +103,8 @@ app_main
        ├─ Button demo
        ├─ Audio demo
        ├─ Battery demo
-       ├─ Wi-Fi scan demo
-       ├─ Bluetooth LE advertising demo
-       └─ Low Power sleep-mode demo
+       ├─ Wi-Fi / ESP-NOW application services
+       └─ Low Power sleep-mode demo
 ```
 
 显示是 UI 的硬依赖，显示或 LVGL 初始化失败时 `app_main` 直接返回。按键、音频、电池是软依赖：初始化失败的菜单项显示 `[FAIL]`，其他页面仍可用。
@@ -121,7 +120,7 @@ app_main
 
 驱动初始化大多设计为幂等，但当前没有统一 deinit API。不要假设可以在运行时反复销毁和重建总线/驱动。
 
-Wi-Fi、NimBLE 和 light/deep sleep 直接使用 ESP-IDF API，不属于板级 BSP。`demo_radio.c` 只管理 NVS、`esp_netif` 和默认 event loop 这些应用级共享前置。Wi-Fi 和 BLE 页在进入时初始化高内存占用的无线栈，退出时停止并释放；不自动抹除已有 NVS 数据来掩盖分区错误。deep sleep 会按 ESP32-C3 语义重启应用，示例用 RTC slow memory 记录唤醒次数。
+Wi-Fi、ESP-NOW 和 light/deep sleep 直接使用 ESP-IDF API，不属于板级 BSP。应用启动时初始化 Wi-Fi 与 ESP-NOW。应用构建已禁用 Bluetooth host/controller；独立的工厂 Recovery 分区继续负责 BLE 安装服务。不自动抹除已有 NVS 数据来掩盖分区错误。deep sleep 会按 ESP32-C3 语义重启应用，示例用 RTC slow memory 记录唤醒次数。
 
 ## 5. 显示与 LVGL
 
@@ -425,7 +424,7 @@ idf.py flash monitor
 | codec/I2S | 1 kHz 音调频率/速度、录音非零且回放速度正确、格式切换、退出页面 |
 | 电池 | 合理 SOC 和 mV、无电量计时正确降级、断续 I2C 的错误恢复表现 |
 | Wi-Fi | 扫描总数和 SSID/RSSI 可见、OK 重扫描、反复进出后仍可扫描 |
-| Bluetooth LE | 手机看到 `FoloPassport`、OK 重启广播、退出后广播消失、反复进出无重启 |
+| Bluetooth LE | 确认 `CONFIG_BT_ENABLED` 未设置，且应用 map 不含 Bluetooth host/controller 符号；另行确认 Recovery 安装链路保持完整 |
 | light/deep sleep | Low Power 页用 UP/DOWN 选择、OK 执行；light sleep 约 2 秒后原地恢复背光；deep sleep 约 5 秒后重启，页面显示 timer 唤醒和 RTC 保留计数 |
 | DMA/内存/UI | build 内存报告、运行时最小堆/最大块、音频与刷屏并发稳定性 |
 
@@ -445,7 +444,7 @@ idf.py flash monitor
 | 录音全零 | `no_dac_ref` 是否为 true、DIN GPIO4、麦克风通路和输入增益 |
 | 录音缓冲分配失败 | C3 无 PSRAM；缩短录音或改流式，检查 largest free block |
 | 电量显示 `--` | 0x63 是否应答、SOC 是否读到 >100/0xFF、profile/启动等待 |
-| Wi-Fi/BLE 第二次进入失败 | 退出页时是否已停止并 deinit radio stack，NVS/event loop 是否只初始化一次 |
+| Wi-Fi/ESP-NOW 启动后异常 | Wi-Fi 初始化、信道一致性、NVS 与 event loop 设置 |
 | light sleep 后黑屏 | timer wake source、`esp_light_sleep_start()` 错误日志、唤醒后是否恢复背光 |
 | deep sleep 后未重启 | timer wake source、启动日志的 wake cause、页面 RTC 计数；当前 demo 使用 RTC timer 唤醒 |
 | 加大 UI 后 I2S NO_MEM | LCD 双缓冲/LVGL pool 与 I2S DMA 争夺内部 RAM |
