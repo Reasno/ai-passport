@@ -312,7 +312,7 @@ static void process_event(const app_event_t *event)
         }
         if (event->button_event == BSP_BTN_LONG && event->button == BSP_BTN_DOWN && s_page == PAGE_FIND) {
             if (ptt_service_available()) ptt_service_set_transmitting(true);
-            else set_message("对讲不可用\n需配对和80KB内存", true);
+            else set_message("对讲不可用\n需配对和70KB内存", true);
             render(); return;
         }
         if (event->button_event == BSP_BTN_LONG && event->button == BSP_BTN_OK && (s_page == PAGE_HOME || s_page == PAGE_GAMES)) {

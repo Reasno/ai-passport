@@ -14,7 +14,7 @@
 #define PTT_MAGIC 0x5450
 #define PTT_VERSION 1
 #define PTT_TYPE_AUDIO 1
-#define PTT_MIN_HEAP (80 * 1024)
+#define PTT_MIN_HEAP (70 * 1024)
 
 typedef struct { uint8_t src[6]; ptt_audio_packet_t packet; } ptt_rx_event_t;
 static const char *TAG = "kp_ptt";
