@@ -6,6 +6,8 @@
 
 ## Unreleased
 
+- Lowered the push-to-talk availability threshold from 80 KB to 70 KB of free heap so invitations remain usable under tighter memory conditions.
+
 - Added a two-device “three-light buzzer” game that reuses ESP-NOW pairing/invitation, adds NTP-like clock-offset sampling and a Host absolute timeline, arbitrates captured button-down timestamps with ACK/retry, handles false starts, ties, and timeouts, and never changes points; serial screenshots now expose side-effect-free `BUZZER`, `BUZZER_ARMED`, `BUZZER_GO`, and `BUZZER_RESULT` debug previews.
 
 - Updated the find-sibling entry footer with the B1 home, B2 push-to-talk, and B3 ring actions while preserving the waiting-page cancel hint; clarified the rock-paper-scissors result footer and made B1 require a long press there.
