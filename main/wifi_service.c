@@ -63,9 +63,9 @@ static void wifi_event(void *arg, esp_event_base_t base, int32_t id, void *data)
         ip_event_got_ip_t *event = data;
         s_failures = 0;
         if (s_retry_timer) esp_timer_stop(s_retry_timer);
-        /* Back on the home AP: both Passports share its channel, so ESP-NOW keeps working
-         * while power save comes back for battery life. */
-        esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
+        /* Keep the radio awake on the home AP so asynchronous ESP-NOW find and game
+         * packets are received reliably even while the display backlight is off. */
+        esp_wifi_set_ps(WIFI_PS_NONE);
         ESP_LOGI(TAG, "WiFi got IP: " IPSTR, IP2STR(&event->ip_info.ip));
         app_model_set_connectivity(true, false);
         app_event_post(&(app_event_t){.type = APP_EVT_CONNECTIVITY}, 0);
@@ -95,7 +95,7 @@ esp_err_t wifi_service_start(void)
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_set_storage(WIFI_STORAGE_RAM));
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_set_config(WIFI_IF_STA, &wifi));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_set_ps(WIFI_PS_MIN_MODEM));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_set_ps(WIFI_PS_NONE));
     err = esp_wifi_start();
     if (err == ESP_OK) { s_started = true; ESP_LOGI(TAG, "后台连接 WiFi SSID=%s", CONFIG_WIFI_SSID); }
     return err;
