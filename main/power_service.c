@@ -55,10 +55,11 @@ static void restore_locked(const char *reason)
         else ESP_LOGW(TAG, "恢复运行态 PM 锁失败: %s", esp_err_to_name(err));
     }
 #endif
-    if (s_lvgl_stopped) {
+    if (s_lvgl_stopped && bsp_lvgl_lock(500)) {
         esp_err_t err = lvgl_port_resume();
         if (err != ESP_OK) ESP_LOGW(TAG, "恢复 LVGL 失败: %s", esp_err_to_name(err));
         else s_lvgl_stopped = false;
+        bsp_lvgl_unlock();
     }
     if (s_level != ACTIVE_BACKLIGHT) {
         s_level = ACTIVE_BACKLIGHT;
@@ -94,10 +95,11 @@ static void timer_cb(void *arg)
     } else {
         s_level = 0;
         bsp_display_backlight(0);
-        if (!s_lvgl_stopped) {
+        if (!s_lvgl_stopped && bsp_lvgl_lock(500)) {
             esp_err_t err = lvgl_port_stop();
             if (err != ESP_OK) ESP_LOGW(TAG, "暂停 LVGL 失败: %s", esp_err_to_name(err));
             else s_lvgl_stopped = true;
+            bsp_lvgl_unlock();
         }
 #ifdef CONFIG_PM_ENABLE
         /* wifi_service intentionally parks a disconnected radio in PS_NONE between

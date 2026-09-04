@@ -129,6 +129,13 @@ static void render(void)
     lv_screen_load_anim(screen, LV_SCR_LOAD_ANIM_NONE, 0, 0, true);
     bsp_lvgl_unlock();
 }
+static void show_find_ring_overlay(void)
+{
+    if (!bsp_lvgl_lock(1000)) return;
+    lv_obj_t *screen = lv_screen_active();
+    if (screen) s_find_overlay = ui_common_find_overlay(screen, s_find_flash);
+    bsp_lvgl_unlock();
+}
 static void go(page_t page, int selected)
 {
 #if CONFIG_ENABLE_SCREENSHOT
@@ -342,7 +349,7 @@ static void process_event(const app_event_t *event)
         s_find_ring_deadline = esp_timer_get_time() / 1000 + 30000;
         s_find_next_flash = esp_timer_get_time() / 1000 + 300;
         ptt_service_set_transmitting(false);
-        power_service_wake(); sound_service_play(SOUND_FIND_RING); render();
+        power_service_wake(); sound_service_play(SOUND_FIND_RING); show_find_ring_overlay();
     } else if (event->type == APP_EVT_FIND_ACK) {
         s_find_waiting = false; s_find_deadline = 0;
         strlcpy(s_find_status, KP_PEER_LABEL "已回应：找到了！", sizeof(s_find_status));
