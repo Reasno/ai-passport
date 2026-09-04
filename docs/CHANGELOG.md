@@ -6,6 +6,8 @@
 
 ## Unreleased
 
+- Capped codec output volume at 85% to reduce speaker clipping at maximum volume.
+
 - Added automatic Light Sleep after 60 seconds of inactivity. GPIO0 keys and ESP-NOW find/game invitations wake the device; remote invitations restore the display and play an alert.
 
 - Added an F1-style audible countdown to the buzzer game: each red light now beeps as it illuminates, followed by a shorter, higher-pitched GO beep when all lights go out.

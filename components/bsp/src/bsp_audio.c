@@ -18,6 +18,9 @@ static uint32_t s_hz;
 static uint8_t  s_bits, s_ch;
 static bool     s_opened;
 
+// Keep 15% headroom below the codec's software maximum to avoid speaker clipping.
+#define BSP_AUDIO_SAFE_MAX_VOLUME 85
+
 static esp_err_t i2s_full_duplex_init(void) {
     i2s_chan_config_t chan = {
         .id = BSP_I2S_PORT,
@@ -166,5 +169,6 @@ esp_err_t bsp_audio_read(void *pcm, size_t bytes) {
 }
 
 void bsp_audio_set_volume(uint8_t percent) {
+    if (percent > BSP_AUDIO_SAFE_MAX_VOLUME) percent = BSP_AUDIO_SAFE_MAX_VOLUME;
     if (s_dev) esp_codec_dev_set_out_vol(s_dev, percent);
 }
