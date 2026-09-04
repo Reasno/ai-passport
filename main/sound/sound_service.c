@@ -24,12 +24,13 @@ void sound_service_audio_unlock(void)
     if (s_audio_lock) xSemaphoreGive(s_audio_lock);
 }
 
-static void tone(float start_hz, float end_hz, int duration_ms, bool decay)
+static void tone(float start_hz, float end_hz, int duration_ms, bool decay, bool interruptible)
 {
     int16_t pcm[CHUNK];
     int total = RATE * duration_ms / 1000;
     float phase = 0;
     for (int base = 0; base < total; base += CHUNK) {
+        if (interruptible && s_stop_ring) return;
         int n = total - base > CHUNK ? CHUNK : total - base;
         for (int i = 0; i < n; i++) {
             float progress = (float)(base + i) / (float)total;
@@ -44,10 +45,10 @@ static void tone(float start_hz, float end_hz, int duration_ms, bool decay)
 static void find_ring(void)
 {
     for (int round = 0; round < 3 && !s_stop_ring; round++) {
-        tone(880, 880, 130, true);
+        tone(880, 880, 130, true, true);
         vTaskDelay(pdMS_TO_TICKS(80));
         if (s_stop_ring) break;
-        tone(1175, 1175, 160, true);
+        tone(1175, 1175, 160, true, true);
         if (round < 2) vTaskDelay(pdMS_TO_TICKS(280));
     }
 }
@@ -63,12 +64,12 @@ static void sound_task(void *arg)
             continue;
         }
         bsp_audio_set_volume(100);
-        if (effect == SOUND_TICK) tone(800, 800, 50, true);
-        else if (effect == SOUND_DING) tone(440, 880, 200, false);
-        else if (effect == SOUND_DU) tone(200, 200, 150, true);
+        if (effect == SOUND_TICK) tone(800, 800, 50, true, false);
+        else if (effect == SOUND_DING) tone(440, 880, 200, false, false);
+        else if (effect == SOUND_DU) tone(200, 200, 150, true, false);
         else if (effect == SOUND_FIND_RING) find_ring();
-        else if (effect == SOUND_BUZZER_GO) tone(1600, 1600, 35, true);
-        else { tone(523, 523, 150, false); tone(659, 659, 150, false); tone(784, 784, 200, false); }
+        else if (effect == SOUND_BUZZER_GO) tone(1600, 1600, 35, true, false);
+        else { tone(523, 523, 150, false, false); tone(659, 659, 150, false, false); tone(784, 784, 200, false, false); }
         sound_service_audio_unlock();
     }
 }
