@@ -3,6 +3,7 @@
 #include "ui_common.h"
 #include "ui_fonts.h"
 #include "logo_assets.h"
+#include "privacy_mode.h"
 #include "ui_pixel_icons.h"
 #include <stdio.h>
 
@@ -57,7 +58,7 @@ lv_obj_t *ui_home_build(const app_model_snapshot_t *model, int selected)
     lv_obj_t *avatar = ui_avatar_create(screen, 106, 1);
     /* Text header: the child's name in the large Chinese font, left column only so
      * that it never runs under the avatar or the status bar. */
-    lv_obj_t *name = ui_common_label(screen, CONFIG_KP_CHILD_NAME, 6, 62, 96, LV_TEXT_ALIGN_CENTER, true);
+    lv_obj_t *name = ui_common_label(screen, privacy_mode_display_name(), 6, 62, 96, LV_TEXT_ALIGN_CENTER, true);
     lv_obj_set_style_text_color(name, lv_color_hex(KP_THEME), 0);
     lv_obj_set_height(name, 32);
     lv_obj_t *role_badge = pill(screen, 21, 120, 62, 24, 0x172B35);
