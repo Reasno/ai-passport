@@ -12,6 +12,10 @@
 #define KEY_TASKS "tasks_str"
 #define KEY_REWARDS "rewards_str"
 #define KEY_SYNC "last_sync_u32"
+#define KEY_RPS_WINS "rps_win_u32"
+#define KEY_RPS_LOSSES "rps_loss_u32"
+#define KEY_BUZZER_WINS "buz_win_u32"
+#define KEY_BUZZER_LOSSES "buz_loss_u32"
 static const char *TAG = "kp_cache";
 /* NVS serialization runs in the UI task; avoid a ~2 KB automatic object there. */
 static app_model_snapshot_t s_cache_model;
@@ -65,6 +69,45 @@ static esp_err_t save_json(const char *key, const char *json) { if (!json) retur
 esp_err_t nvs_cache_save_tasks(const char *json) { return save_json(KEY_TASKS, json); }
 esp_err_t nvs_cache_save_rewards(const char *json) { return save_json(KEY_REWARDS, json); }
 esp_err_t nvs_cache_save_last_sync(uint32_t value) { nvs_handle_t h; esp_err_t e = open_write(&h); if (e == ESP_OK) { e = nvs_set_u32(h, KEY_SYNC, value); if (e == ESP_OK) e = nvs_commit(h); nvs_close(h); } return e; }
+
+esp_err_t nvs_cache_load_game_stats(uint32_t *rps_wins, uint32_t *rps_losses,
+                                    uint32_t *buzzer_wins, uint32_t *buzzer_losses)
+{
+    if (!rps_wins || !rps_losses || !buzzer_wins || !buzzer_losses) return ESP_ERR_INVALID_ARG;
+    *rps_wins = *rps_losses = *buzzer_wins = *buzzer_losses = 0;
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(NS, NVS_READONLY, &h);
+    if (err == ESP_ERR_NVS_NOT_FOUND) return ESP_OK;
+    if (err != ESP_OK) return err;
+    if (nvs_get_u32(h, KEY_RPS_WINS, rps_wins) == ESP_ERR_NVS_NOT_FOUND) *rps_wins = 0;
+    if (nvs_get_u32(h, KEY_RPS_LOSSES, rps_losses) == ESP_ERR_NVS_NOT_FOUND) *rps_losses = 0;
+    if (nvs_get_u32(h, KEY_BUZZER_WINS, buzzer_wins) == ESP_ERR_NVS_NOT_FOUND) *buzzer_wins = 0;
+    if (nvs_get_u32(h, KEY_BUZZER_LOSSES, buzzer_losses) == ESP_ERR_NVS_NOT_FOUND) *buzzer_losses = 0;
+    nvs_close(h);
+    return ESP_OK;
+}
+
+static esp_err_t save_game_stats(const char *wins_key, const char *losses_key,
+                                 uint32_t wins, uint32_t losses)
+{
+    nvs_handle_t h = 0;
+    esp_err_t err = open_write(&h);
+    if (err == ESP_OK) err = nvs_set_u32(h, wins_key, wins);
+    if (err == ESP_OK) err = nvs_set_u32(h, losses_key, losses);
+    if (err == ESP_OK) err = nvs_commit(h);
+    if (h) nvs_close(h);
+    return err;
+}
+
+esp_err_t nvs_cache_save_rps_stats(uint32_t wins, uint32_t losses)
+{
+    return save_game_stats(KEY_RPS_WINS, KEY_RPS_LOSSES, wins, losses);
+}
+
+esp_err_t nvs_cache_save_buzzer_stats(uint32_t wins, uint32_t losses)
+{
+    return save_game_stats(KEY_BUZZER_WINS, KEY_BUZZER_LOSSES, wins, losses);
+}
 
 esp_err_t nvs_cache_save_model(void)
 {

@@ -36,6 +36,8 @@ typedef struct {
     int32_t clock_offset_ms;
     uint16_t sync_rtt_ms;
     uint32_t seconds_left;
+    uint32_t wins;
+    uint32_t losses;
     char status[64];
 } buzzer_game_snapshot_t;
 
