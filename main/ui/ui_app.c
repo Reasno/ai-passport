@@ -266,15 +266,6 @@ static void process_event(const app_event_t *event)
 {
     if (event->type == APP_EVT_KEY) {
         ESP_LOGI(TAG, "按键=%d event=%d", event->button, event->button_event);
-        if (s_ignore_key_until_release) {
-            if (event->button_event == BSP_BTN_LONG) s_ignore_ring_click = false;
-            if (event->button_event == BSP_BTN_RELEASE) s_ignore_key_until_release = false;
-            return;
-        }
-        if (s_ignore_ring_click) {
-            if (event->button_event == BSP_BTN_CLICK) { s_ignore_ring_click = false; return; }
-            if (event->button_event == BSP_BTN_PRESS) s_ignore_ring_click = false;
-        }
         if (s_find_ringing) {
             sound_service_stop_ring();
             find_service_ack(s_find_sender);
@@ -286,6 +277,15 @@ static void process_event(const app_event_t *event)
             set_message("已告诉" KP_PEER_LABEL "：我在这里", false);
             render();
             return;
+        }
+        if (s_ignore_key_until_release) {
+            if (event->button_event == BSP_BTN_LONG) s_ignore_ring_click = false;
+            if (event->button_event == BSP_BTN_RELEASE) s_ignore_key_until_release = false;
+            return;
+        }
+        if (s_ignore_ring_click) {
+            if (event->button_event == BSP_BTN_CLICK) { s_ignore_ring_click = false; return; }
+            if (event->button_event == BSP_BTN_PRESS) s_ignore_ring_click = false;
         }
         if (event->button_event == BSP_BTN_RELEASE && event->button == BSP_BTN_DOWN && ptt_service_is_transmitting()) {
             ptt_service_set_transmitting(false); render(); return;
@@ -335,6 +335,8 @@ static void process_event(const app_event_t *event)
         show_debug_page((app_debug_page_t)event->value);
 #endif
     } else if (event->type == APP_EVT_FIND_RING) {
+        s_ignore_key_until_release = false;
+        s_ignore_ring_click = false;
         strlcpy(s_find_sender, event->text, sizeof(s_find_sender));
         s_find_ringing = true; s_find_flash = true;
         s_find_ring_deadline = esp_timer_get_time() / 1000 + 30000;
@@ -374,9 +376,11 @@ static void process_event(const app_event_t *event)
         game_snapshot_t *game = game_snapshot();
         buzzer_game_snapshot_t *buzzer = buzzer_snapshot();
         if (buzzer->state == BUZZER_STATE_INVITE_RECEIVED) {
+            power_service_wake();
             s_page = PAGE_BUZZER;
             render();
         } else if (game->state == GAME_STATE_INVITE_RECEIVED) {
+            power_service_wake();
             /* Entering the page is not enough: the current LVGL tree still belongs
              * to the previous page until it is explicitly rebuilt. */
             s_page = PAGE_RPS;
