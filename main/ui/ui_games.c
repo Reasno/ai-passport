@@ -145,6 +145,10 @@ lv_obj_t *ui_rps_build(const app_model_snapshot_t *model, const game_snapshot_t 
     rps_choice_card(screen, 87, &s_rps_scissors, "剪刀", shown == RPS_SCISSORS);
     rps_choice_card(screen, 166, &s_rps_paper, "布", shown == RPS_PAPER);
     ui_common_label(screen, game->status, 12, 153, 216, LV_TEXT_ALIGN_CENTER, false);
+    char record[48];
+    snprintf(record, sizeof(record), "本机战绩 %lu胜 %lu负",
+             (unsigned long)game->wins, (unsigned long)game->losses);
+    ui_common_label_small(screen, record, 12, 176, 216, LV_TEXT_ALIGN_CENTER);
     const char *footer = "长按B1主页";
     if (game->state == GAME_STATE_WAITING_CHOICE) {
         ui_common_label_small(screen, game->local_choice == RPS_NONE ? "选择后按确认出拳" : "已锁定出拳，等待对方", 6, 194, 228, LV_TEXT_ALIGN_CENTER);
@@ -204,6 +208,10 @@ lv_obj_t *ui_buzzer_build(const app_model_snapshot_t *model, const buzzer_game_s
     lv_obj_t *role_label = ui_common_label_small(screen, role, 12, 136, 216, LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_text_color(role_label, lv_color_hex(KP_THEME), 0);
     ui_common_label(screen, game->status, 12, 158, 216, LV_TEXT_ALIGN_CENTER, false);
+    char record[48];
+    snprintf(record, sizeof(record), "本机战绩 %lu胜 %lu负",
+             (unsigned long)game->wins, (unsigned long)game->losses);
+    ui_common_label_small(screen, record, 12, 181, 216, LV_TEXT_ALIGN_CENTER);
 
     const char *hint = "等待邀请";
     const char *footer = "长按B1主页";

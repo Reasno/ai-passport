@@ -1,5 +1,6 @@
 #include "game_service.h"
 #include "app_events.h"
+#include "nvs_cache.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_random.h"
@@ -45,13 +46,24 @@ static int8_t result_for(rps_choice_t own, rps_choice_t other)
             (own == RPS_SCISSORS && other == RPS_PAPER) ||
             (own == RPS_PAPER && other == RPS_ROCK)) ? 1 : -1;
 }
+static void record_result(int8_t result)
+{
+    if (result > 0) ++s_game.wins;
+    else if (result < 0) ++s_game.losses;
+    else return;
+    esp_err_t err = nvs_cache_save_rps_stats(s_game.wins, s_game.losses);
+    if (err != ESP_OK) ESP_LOGW(TAG, "保存石头剪刀布战绩失败: %s", esp_err_to_name(err));
+}
 static void finish_if_ready(void)
 {
     if (s_game.local_choice == RPS_NONE || s_game.remote_choice == RPS_NONE) return;
     bool first_result = s_game.state != GAME_STATE_RESULT;
     s_game.state = GAME_STATE_RESULT; s_game.result = result_for(s_game.local_choice, s_game.remote_choice);
     status(s_game.result > 0 ? "你赢了！" : s_game.result < 0 ? "你输了，下次加油！" : "平局，再来一次！");
-    if (first_result) s_deadline = now_ms() + 2000;
+    if (first_result) {
+        s_deadline = now_ms() + 2000;
+        record_result(s_game.result);
+    }
     ESP_LOGI(TAG, "RPS entertainment result session=%u local=%u remote=%u result=%d (no points, no MQTT)",
              s_game.session, s_game.local_choice, s_game.remote_choice, s_game.result);
 }
@@ -63,6 +75,10 @@ esp_err_t game_service_start(void)
     if (!s_lock) s_lock = xSemaphoreCreateMutex();
     if (!s_lock) return ESP_ERR_NO_MEM;
     memset(&s_game, 0, sizeof(s_game)); s_game.paired = espnow_service_has_peer(); status("准备好了");
+    uint32_t buzzer_wins, buzzer_losses;
+    esp_err_t stats_err = nvs_cache_load_game_stats(&s_game.wins, &s_game.losses,
+                                                     &buzzer_wins, &buzzer_losses);
+    if (stats_err != ESP_OK) ESP_LOGW(TAG, "加载游戏战绩失败: %s", esp_err_to_name(stats_err));
     ESP_LOGI(TAG, "heap gates pair=%d radar=%d rps=%d free=%lu", game_service_heap_allows_pairing(),
              game_service_heap_allows_radar(), game_service_heap_allows_rps(), (unsigned long)esp_get_free_heap_size());
     return ESP_OK;
@@ -191,7 +207,13 @@ void game_service_tick(int64_t now)
         if (count != s_game.countdown) { s_game.countdown = count; changed = true; }
         if (!count) { s_game.state = GAME_STATE_WAITING_CHOICE; status("请出拳！"); s_deadline = now + CHOICE_TIMEOUT_MS; changed = true; }
     }
-    if (s_game.state == GAME_STATE_WAITING_CHOICE && now >= s_deadline) { s_game.state = GAME_STATE_RESULT; s_game.result = s_game.local_choice != RPS_NONE ? 1 : -1; status(s_game.result > 0 ? "对方超时，你赢了！" : "出拳超时"); changed = true; }
+    if (s_game.state == GAME_STATE_WAITING_CHOICE && now >= s_deadline) {
+        s_game.state = GAME_STATE_RESULT;
+        s_game.result = s_game.local_choice != RPS_NONE ? 1 : -1;
+        status(s_game.result > 0 ? "对方超时，你赢了！" : "出拳超时");
+        record_result(s_game.result);
+        changed = true;
+    }
     if (s_game.radar_active && now - s_last_ping >= 1000) { s_last_ping = now; espnow_service_send(ESPNOW_MSG_RADAR_PING, 0, 0, 0, 0, false); }
     if (s_game.radar_active && s_game.peer_nearby && now - s_last_radar_rx >= RADAR_LOST_MS) { s_game.peer_nearby = false; s_game.distance_bars = 0; changed = true; }
     uint32_t seconds_left = s_deadline > now ? (uint32_t)((s_deadline - now + 999) / 1000) : 0;

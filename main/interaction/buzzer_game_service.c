@@ -1,5 +1,6 @@
 #include "buzzer_game_service.h"
 #include "app_events.h"
+#include "nvs_cache.h"
 #include "esp_log.h"
 #include "esp_random.h"
 #include "esp_timer.h"
@@ -65,9 +66,12 @@ static void send_data(espnow_msg_type_t type, uint16_t sequence, uint32_t data)
 static void reset_round(bool host)
 {
     uint16_t session = s_game.session;
+    uint32_t wins = s_game.wins, losses = s_game.losses;
     bool paired = espnow_service_has_peer();
     memset(&s_game, 0, sizeof(s_game));
     s_game.session = session;
+    s_game.wins = wins;
+    s_game.losses = losses;
     s_game.paired = paired;
     s_game.is_host = host;
     s_best_rtt = UINT16_MAX;
@@ -79,7 +83,10 @@ static void reset_round(bool host)
 static void enter_idle(const char *text)
 {
     bool paired = espnow_service_has_peer();
+    uint32_t wins = s_game.wins, losses = s_game.losses;
     memset(&s_game, 0, sizeof(s_game));
+    s_game.wins = wins;
+    s_game.losses = losses;
     s_game.paired = paired;
     s_game.state = BUZZER_STATE_IDLE;
     set_status(text);
@@ -90,6 +97,14 @@ static void send_result(void)
     send_data(ESPNOW_MSG_BUZZER_RESULT, 0, s_result_code);
     s_last_tx = monotonic_ms();
 }
+static void record_result(buzzer_result_t result)
+{
+    if (result == BUZZER_RESULT_WIN) ++s_game.wins;
+    else if (result == BUZZER_RESULT_LOSE) ++s_game.losses;
+    else return;
+    esp_err_t err = nvs_cache_save_buzzer_stats(s_game.wins, s_game.losses);
+    if (err != ESP_OK) ESP_LOGW(TAG, "保存抢答器战绩失败: %s", esp_err_to_name(err));
+}
 static void finish_host(uint8_t code)
 {
     s_result_code = code;
@@ -98,6 +113,7 @@ static void finish_host(uint8_t code)
     else if (code == 2) { s_game.result = BUZZER_RESULT_LOSE; set_status("对方赢了"); }
     else if (code == 3) { s_game.result = BUZZER_RESULT_TIE; set_status("同时按下，平局！"); }
     else { s_game.result = BUZZER_RESULT_TIMEOUT; set_status("本局超时"); }
+    record_result(s_game.result);
     s_result_retry_until = monotonic_ms() + RESULT_RETRY_LIMIT_MS;
     s_result_acked = false;
     send_result();
@@ -164,6 +180,10 @@ esp_err_t buzzer_game_service_start(void)
     if (!s_lock) s_lock = xSemaphoreCreateMutex();
     if (!s_lock) return ESP_ERR_NO_MEM;
     enter_idle("准备好了");
+    uint32_t rps_wins, rps_losses;
+    esp_err_t stats_err = nvs_cache_load_game_stats(&rps_wins, &rps_losses,
+                                                     &s_game.wins, &s_game.losses);
+    if (stats_err != ESP_OK) ESP_LOGW(TAG, "加载游戏战绩失败: %s", esp_err_to_name(stats_err));
     return ESP_OK;
 }
 void buzzer_game_service_snapshot(buzzer_game_snapshot_t *out)
@@ -381,12 +401,14 @@ void buzzer_game_service_on_packet(const uint8_t src[6], const espnow_game_packe
     } else if (p->type == ESPNOW_MSG_BUZZER_PRESS_ACK && !s_game.is_host && data == s_local_press_host) {
         s_press_acked = true;
     } else if (p->type == ESPNOW_MSG_BUZZER_RESULT && !s_game.is_host) {
+        bool first_result = s_game.state != BUZZER_STATE_RESULT;
         s_result_code = (uint8_t)data;
         s_game.state = BUZZER_STATE_RESULT;
         if (s_result_code == 1) { s_game.result = BUZZER_RESULT_LOSE; set_status("对方赢了"); }
         else if (s_result_code == 2) { s_game.result = BUZZER_RESULT_WIN; set_status("你赢了！"); }
         else if (s_result_code == 3) { s_game.result = BUZZER_RESULT_TIE; set_status("同时按下，平局！"); }
         else { s_game.result = BUZZER_RESULT_TIMEOUT; set_status("本局超时"); }
+        if (first_result) record_result(s_game.result);
         send_data(ESPNOW_MSG_BUZZER_RESULT_ACK, 0, data); changed = true;
     } else if (p->type == ESPNOW_MSG_BUZZER_RESULT_ACK && s_game.is_host && data == s_result_code) {
         s_result_acked = true;
