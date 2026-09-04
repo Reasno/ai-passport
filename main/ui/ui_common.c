@@ -192,28 +192,37 @@ void ui_common_message(lv_obj_t *screen, const char *text, bool error)
     lv_obj_update_layout(box);
     lv_obj_align(box, LV_ALIGN_BOTTOM_MID, 0, -40);
 }
-void ui_common_find_overlay_tint(lv_obj_t *box, bool bright)
+void ui_common_find_overlay_tint(lv_obj_t *overlay, bool bright)
 {
-    lv_obj_set_style_bg_color(box, lv_color_hex(bright ? 0x713C18 : 0x402511), 0);
+    if (!overlay) return;
+    lv_obj_t *box = lv_obj_get_child(overlay, 0);
+    if (box) lv_obj_set_style_bg_color(box, lv_color_hex(bright ? 0x713C18 : 0x402511), 0);
 }
 
-lv_obj_t *ui_common_find_overlay(lv_obj_t *screen, bool bright)
+lv_obj_t *ui_common_find_overlay(lv_obj_t *parent, bool bright)
 {
-    lv_obj_t *box = ui_common_card(screen, 12, 84, 216, 132, false, true);
-    ui_common_find_overlay_tint(box, bright);
+    /* This persistent root lives on lv_layer_top(). It is created once during UI
+     * startup and only hidden/shown while ringing, so a remote Find event never
+     * allocates from LVGL's small fixed memory pool. */
+    lv_obj_t *overlay = lv_obj_create(parent);
+    base_obj(overlay);
+    lv_obj_set_size(overlay, 240, 320);
+    lv_obj_set_style_bg_opa(overlay, LV_OPA_TRANSP, 0);
+    lv_obj_remove_flag(overlay, LV_OBJ_FLAG_CLICKABLE);
+
+    lv_obj_t *box = ui_common_card(overlay, 12, 84, 216, 132, false, true);
     lv_obj_set_style_border_width(box, 3, 0);
     lv_obj_set_style_border_color(box, lv_color_hex(KP_YELLOW), 0);
     ui_radar_icon_create(box, 88, 8, KP_YELLOW, 3);
     ui_common_label(box, KP_PEER_LABEL "正在找你！", 8, 56, 192, LV_TEXT_ALIGN_CENTER, true);
     ui_common_label(box, "按任意键停止", 8, 86, 192, LV_TEXT_ALIGN_CENTER, true);
-    /* The ringing overlay owns the footer; keep it above every page/overlay object
-     * and use the alert color so the receiver instruction cannot disappear. */
-    ui_common_footer(screen, "按任意键停止", false);
-    lv_obj_t *footer = lv_obj_get_child(screen, -1);
+
+    ui_common_footer(overlay, "按任意键停止", false);
+    lv_obj_t *footer = lv_obj_get_child(overlay, -1);
     if (footer) {
-        lv_obj_move_foreground(footer);
         lv_obj_t *footer_label = lv_obj_get_child(footer, 0);
         if (footer_label) lv_obj_set_style_text_color(footer_label, lv_color_hex(KP_YELLOW), 0);
     }
-    return box;
+    ui_common_find_overlay_tint(overlay, bright);
+    return overlay;
 }
