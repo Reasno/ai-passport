@@ -34,10 +34,10 @@ CONFIG_LV_COLOR_DEPTH_16=y
 CONFIG_LV_FONT_MONTSERRAT_14=y
 CONFIG_LV_FONT_MONTSERRAT_20=y
 # LVGL 内置 malloc 池大小(KB)。它是独立静态区、不与系统堆共享,配大了会白白占用 RAM。
-# 本 UI 会常驻预分配 Find overlay；64KB 在 400KB SRAM、9.6KB 单 framebuffer 下
-# 仍为 Wi-Fi/MQTT/I2S 与任务栈保留余量；96KB 会把实测稳定空闲堆压到危险区。
+# 本 UI 会常驻预分配 Find overlay；48KB 在 400KB SRAM、9.6KB 单 framebuffer 下
+# 可容纳页面与 overlay，同时为 Wi-Fi/MQTT/I2S、PTT 和任务栈保留动态堆余量。
 # malloc assert 关闭后 LVGL 分配 API 可返回 NULL，由 UI 走“只响铃不显示 overlay”降级。
-CONFIG_LV_MEM_SIZE_KILOBYTES=64
+CONFIG_LV_MEM_SIZE_KILOBYTES=48
 CONFIG_LV_USE_ASSERT_MALLOC=n
 
 # --- 系统 ---
