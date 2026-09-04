@@ -14,7 +14,11 @@ static void battery_task(void *arg)
 {
     (void)arg;
     esp_err_t init = bsp_battery_init();
-    if (init != ESP_OK) ESP_LOGW(TAG, "CW2017 unavailable: %s; status bar will show --%%", esp_err_to_name(init));
+    if (init == ESP_ERR_TIMEOUT) {
+        ESP_LOGW(TAG, "CW2017 SOC initialization timed out after 5s; status bar will show --%%");
+    } else if (init != ESP_OK) {
+        ESP_LOGW(TAG, "CW2017 unavailable: %s; status bar will show --%%", esp_err_to_name(init));
+    }
     for (;;) {
         int soc = init == ESP_OK ? bsp_battery_soc() : -1;
         xSemaphoreTake(s_lock, portMAX_DELAY);
