@@ -25,7 +25,7 @@ esp_err_t power_service_start(void)
     s_last_activity_ms = esp_timer_get_time() / 1000;
     bsp_display_backlight(80);
 #ifdef CONFIG_PM_ENABLE
-    esp_pm_config_t pm = {.max_freq_mhz = 160, .min_freq_mhz = 80, .light_sleep_enable = false};
+    esp_pm_config_t pm = {.max_freq_mhz = 160, .min_freq_mhz = 80, .light_sleep_enable = true};
     err = esp_pm_configure(&pm);
     if (err != ESP_OK) ESP_LOGW(TAG, "PM配置失败: %s", esp_err_to_name(err));
 #else
