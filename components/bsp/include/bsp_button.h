@@ -16,7 +16,8 @@ typedef enum {
     BSP_BTN_PRESS = 0,   // 按下瞬间(低延迟,适合游戏类即时响应)
     BSP_BTN_CLICK,       // 单击(按下并抬起)
     BSP_BTN_DOUBLE,      // 双击
-    BSP_BTN_LONG,        // 长按达到阈值
+    BSP_BTN_LONG,        // 长按达到默认阈值
+    BSP_BTN_HOLD_5S,     // 持续按住 5 秒（当前仅为 B3 注册）
     BSP_BTN_RELEASE,     // 抬起（用于停止按住说话）
 } bsp_btn_ev_t;
 

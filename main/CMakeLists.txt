@@ -11,6 +11,7 @@ idf_component_register(
          "mqtt_service.c"
          "power_service.c"
          "battery_service.c"
+         "privacy_mode.c"
          "screenshot_service.c"
          "interaction/espnow_service.c"
          "interaction/find_service.c"

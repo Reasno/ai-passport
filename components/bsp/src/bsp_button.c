@@ -79,6 +79,8 @@ static void cb_press (void *a, void *u) { on_event(a, u, BSP_BTN_PRESS);  }
 static void cb_click (void *a, void *u) { on_event(a, u, BSP_BTN_CLICK);  }
 static void cb_double(void *a, void *u) { on_event(a, u, BSP_BTN_DOUBLE); }
 static void cb_long  (void *a, void *u) { on_event(a, u, BSP_BTN_LONG);   }
+static void cb_hold_5s(void *a, void *u) { on_event(a, u, BSP_BTN_HOLD_5S); }
+static void cb_release(void *a, void *u) { on_event(a, u, BSP_BTN_RELEASE); }
 
 // 初始化中途失败时先停掉所有 button driver，再释放本文件持有的校准与 ADC unit。
 // button driver 仍在轮询时不能先删 ADC，否则 timer callback 会访问失效句柄。
@@ -115,11 +117,18 @@ static void button_cleanup(void) {
     }
 }
 
-static esp_err_t register_callbacks(button_handle_t button, void *index) {
+static esp_err_t register_callbacks(button_handle_t button, void *index, bool is_ok) {
     esp_err_t e = iot_button_register_cb(button, BUTTON_PRESS_DOWN, NULL, cb_press, index);
     if (e == ESP_OK) e = iot_button_register_cb(button, BUTTON_SINGLE_CLICK, NULL, cb_click, index);
     if (e == ESP_OK) e = iot_button_register_cb(button, BUTTON_DOUBLE_CLICK, NULL, cb_double, index);
     if (e == ESP_OK) e = iot_button_register_cb(button, BUTTON_LONG_PRESS_START, NULL, cb_long, index);
+    if (e == ESP_OK) e = iot_button_register_cb(button, BUTTON_PRESS_UP, NULL, cb_release, index);
+    if (e == ESP_OK && is_ok) {
+        button_event_args_t hold_5s = {
+            .long_press.press_time = 5000,
+        };
+        e = iot_button_register_cb(button, BUTTON_LONG_PRESS_START, &hold_5s, cb_hold_5s, index);
+    }
     return e;
 }
 
@@ -186,7 +195,7 @@ esp_err_t bsp_button_init(bsp_btn_cb_t cb, void *user) {
             return e;
         }
         void *idx = (void *)(intptr_t)i;
-        e = register_callbacks(s_btn[i], idx);
+        e = register_callbacks(s_btn[i], idx, i == BSP_BTN_OK);
         if (e != ESP_OK) {
             ESP_LOGE(TAG, "按键 %d 回调注册失败: %s", i, esp_err_to_name(e));
             button_cleanup();

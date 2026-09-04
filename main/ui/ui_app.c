@@ -7,6 +7,7 @@
 #include "mqtt_service.h"
 #include "nvs_cache.h"
 #include "power_service.h"
+#include "privacy_mode.h"
 #include "ptt_service.h"
 #include "sound_service.h"
 #include "ui_common.h"
@@ -35,6 +36,8 @@ static char s_message[128]; static bool s_message_error; static int64_t s_messag
 static int s_lottery_rotation; static bool s_lottery_animating; static int64_t s_lottery_reveal_at;
 static bool s_suppress_wake_key;
 static bool s_buzzer_press_consumed;
+static int64_t s_b3_press_started;
+static bool s_b3_privacy_consumed;
 #if CONFIG_ENABLE_SCREENSHOT
 typedef enum { DEBUG_LOTTERY_IDLE, DEBUG_LOTTERY_SPIN, DEBUG_LOTTERY_RESULT } debug_lottery_t;
 typedef enum { DEBUG_BUZZER_NONE, DEBUG_BUZZER_ARMED, DEBUG_BUZZER_GO, DEBUG_BUZZER_RESULT } debug_buzzer_t;
@@ -302,6 +305,23 @@ static void process_event(const app_event_t *event)
 {
     if (event->type == APP_EVT_KEY) {
         ESP_LOGI(TAG, "按键=%d event=%d", event->button, event->button_event);
+        bool b3_pair_on_release = false;
+        if (event->button == BSP_BTN_OK && event->button_event == BSP_BTN_PRESS) {
+            s_b3_press_started = event->timestamp_ms;
+            s_b3_privacy_consumed = false;
+        } else if (event->button == BSP_BTN_OK && event->button_event == BSP_BTN_HOLD_5S) {
+            privacy_mode_toggle();
+            s_b3_privacy_consumed = true;
+            set_message(privacy_mode_is_active() ? "隐私模式已开启" : "隐私模式已关闭", false);
+            sound_service_play(SOUND_DING);
+            render();
+            return;
+        } else if (event->button == BSP_BTN_OK && event->button_event == BSP_BTN_RELEASE) {
+            b3_pair_on_release = s_b3_press_started > 0 && !s_b3_privacy_consumed &&
+                                 event->timestamp_ms - s_b3_press_started >= 1000;
+            s_b3_press_started = 0;
+            s_b3_privacy_consumed = false;
+        }
         if (s_find_ringing) {
             sound_service_stop_ring();
             find_service_ack(s_find_sender);
@@ -351,7 +371,10 @@ static void process_event(const app_event_t *event)
             else set_message("对讲不可用\n需配对和70KB内存", true);
             render(); return;
         }
-        if (event->button_event == BSP_BTN_LONG && event->button == BSP_BTN_OK && (s_page == PAGE_HOME || s_page == PAGE_GAMES)) {
+        /* The 1-second B3 long event is deferred until release so a 5-second hold can
+         * toggle privacy without also starting pairing. */
+        if (event->button_event == BSP_BTN_LONG && event->button == BSP_BTN_OK) return;
+        if (b3_pair_on_release && (s_page == PAGE_HOME || s_page == PAGE_GAMES)) {
             if (game_service_heap_allows_pairing()) { game_service_start_pairing(); go(PAGE_GAMES, 0); }
             else { set_message("内存不足，无法配对", true); render(); }
             return;
