@@ -18,6 +18,11 @@
 #define ESPNOW_VERSION 1
 #define PAIR_NS "kp_pair"
 #define PAIR_KEY "peer_mac"
+/* Keep ESP-NOW reachable during automatic Light Sleep. A 50 ms window every
+ * 100 ms halves the connectionless-radio duty cycle; all invitation senders
+ * retry with a phase-shifting cadence so a sleeping peer is eventually heard. */
+#define ESPNOW_WAKE_INTERVAL_MS 100
+#define ESPNOW_WAKE_WINDOW_MS 50
 
 typedef struct { uint8_t src[6]; espnow_game_packet_t packet; int8_t rssi; } rx_event_t;
 static const char *TAG = "kp_espnow";
@@ -154,6 +159,8 @@ esp_err_t espnow_service_start(void)
     if (s_ready) return ESP_OK;
     s_queue = xQueueCreate(8, sizeof(rx_event_t)); if (!s_queue) return ESP_ERR_NO_MEM;
     esp_err_t err = esp_now_init(); if (err != ESP_OK) return err;
+    if ((err = esp_wifi_connectionless_module_set_wake_interval(ESPNOW_WAKE_INTERVAL_MS)) != ESP_OK) return err;
+    if ((err = esp_now_set_wake_window(ESPNOW_WAKE_WINDOW_MS)) != ESP_OK) return err;
     if ((err = esp_now_register_recv_cb(recv_cb)) != ESP_OK) return err;
     if (!add_peer(BROADCAST)) return ESP_FAIL;
     load_peer();

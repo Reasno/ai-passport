@@ -377,10 +377,12 @@ static void process_event(const app_event_t *event)
         buzzer_game_snapshot_t *buzzer = buzzer_snapshot();
         if (buzzer->state == BUZZER_STATE_INVITE_RECEIVED) {
             power_service_wake();
+            sound_service_play(SOUND_DING);
             s_page = PAGE_BUZZER;
             render();
         } else if (game->state == GAME_STATE_INVITE_RECEIVED) {
             power_service_wake();
+            sound_service_play(SOUND_DING);
             /* Entering the page is not enough: the current LVGL tree still belongs
              * to the previous page until it is explicitly rebuilt. */
             s_page = PAGE_RPS;
