@@ -14,13 +14,15 @@
 #define PTT_MAGIC 0x5450
 #define PTT_VERSION 1
 #define PTT_TYPE_AUDIO 1
-#define PTT_MIN_HEAP (70 * 1024)
+#define PTT_MIN_HEAP (30 * 1024)
+#define PTT_RUNTIME_MIN_HEAP (20 * 1024)
 
 typedef struct { uint8_t src[6]; ptt_audio_packet_t packet; } ptt_rx_event_t;
 static const char *TAG = "kp_ptt";
 static QueueHandle_t s_rx_queue;
 static volatile bool s_available;
 static volatile bool s_transmitting;
+static bool s_heap_fuse_warned;
 static uint16_t s_sequence;
 
 static uint16_t packet_crc(const ptt_audio_packet_t *packet)
@@ -53,6 +55,23 @@ static int16_t ulaw_to_linear(uint8_t value)
 bool ptt_service_heap_allows(void) { return esp_get_free_heap_size() >= PTT_MIN_HEAP; }
 bool ptt_service_available(void) { return s_available && ptt_service_heap_allows() && espnow_service_has_peer(); }
 bool ptt_service_is_transmitting(void) { return s_transmitting; }
+static bool runtime_heap_allows(const char *direction)
+{
+    uint32_t free_heap = esp_get_free_heap_size();
+    if (free_heap >= PTT_RUNTIME_MIN_HEAP) {
+        s_heap_fuse_warned = false;
+        return true;
+    }
+    bool was_transmitting = s_transmitting;
+    s_transmitting = false;
+    if (!s_heap_fuse_warned) {
+        ESP_LOGW(TAG, "PTT %s stopped: low heap %lu < %u bytes",
+                 direction, (unsigned long)free_heap, PTT_RUNTIME_MIN_HEAP);
+        s_heap_fuse_warned = true;
+    }
+    if (was_transmitting) app_event_post(&(app_event_t){.type = APP_EVT_GAME_UPDATE}, 0);
+    return false;
+}
 void ptt_service_set_transmitting(bool active)
 {
     if (active && !ptt_service_available()) return;
@@ -94,6 +113,7 @@ static void transmit_session(void)
     ptt_audio_packet_t packet = {.magic = PTT_MAGIC, .version = PTT_VERSION, .type = PTT_TYPE_AUDIO};
     ESP_LOGI(TAG, "PTT TX start: 8kHz mono, 20ms, G.711 mu-law");
     while (s_transmitting) {
+        if (!runtime_heap_allows("TX")) break;
         if (bsp_audio_read(pcm, sizeof(pcm)) != ESP_OK) {
             mark_rx_unavailable("bsp_audio_read failed");
             break;
@@ -110,6 +130,7 @@ static void transmit_session(void)
 static void play_packet(const ptt_audio_packet_t *packet)
 {
     if (packet->checksum != packet_crc(packet) || s_transmitting) return;
+    if (!runtime_heap_allows("RX")) return;
     if (!sound_service_audio_lock(pdMS_TO_TICKS(10))) return;
     if (bsp_audio_set_format(8000, 16, 1) == ESP_OK) {
         int16_t pcm[PTT_SAMPLES_PER_PACKET];
