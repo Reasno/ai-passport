@@ -124,16 +124,45 @@ static void render(void)
     else if (s_page == PAGE_RPS) screen = ui_rps_build(model, game);
     else screen = ui_buzzer_build(model, buzzer);
     if (s_message[0] && esp_timer_get_time() / 1000 < s_message_until) ui_common_message(screen, s_message, s_message_error);
-    if (s_find_ringing) s_find_overlay = ui_common_find_overlay(screen, s_find_flash);
-    else s_find_overlay = NULL;
     lv_screen_load_anim(screen, LV_SCR_LOAD_ANIM_NONE, 0, 0, true);
+    bsp_lvgl_unlock();
+}
+static void set_find_overlay_visible(bool visible)
+{
+    if (!s_find_overlay || !bsp_lvgl_lock(100)) return;
+    if (visible) {
+        ui_common_find_overlay_tint(s_find_overlay, s_find_flash);
+        lv_obj_remove_flag(s_find_overlay, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(s_find_overlay);
+    } else {
+        lv_obj_add_flag(s_find_overlay, LV_OBJ_FLAG_HIDDEN);
+    }
     bsp_lvgl_unlock();
 }
 static void show_find_ring_overlay(void)
 {
-    if (!bsp_lvgl_lock(1000)) return;
-    lv_obj_t *screen = lv_screen_active();
-    if (screen) s_find_overlay = ui_common_find_overlay(screen, s_find_flash);
+    if (!s_find_overlay) {
+        ESP_LOGE(TAG, "Find overlay unavailable; ringing without visual overlay");
+        return;
+    }
+    set_find_overlay_visible(true);
+}
+static void ui_app_init(void)
+{
+    if (!bsp_lvgl_lock(1000)) {
+        ESP_LOGE(TAG, "Find overlay preallocation skipped: LVGL lock timeout");
+        return;
+    }
+    s_find_overlay = ui_common_find_overlay(lv_layer_top(), false);
+    if (s_find_overlay) {
+        lv_obj_add_flag(s_find_overlay, LV_OBJ_FLAG_HIDDEN);
+        lv_mem_monitor_t monitor;
+        lv_mem_monitor(&monitor);
+        ESP_LOGI(TAG, "Find overlay preallocated; LVGL free=%lu biggest=%lu",
+                 (unsigned long)monitor.free_size, (unsigned long)monitor.free_biggest_size);
+    } else {
+        ESP_LOGE(TAG, "Find overlay preallocation failed; ringing will continue without overlay");
+    }
     bsp_lvgl_unlock();
 }
 static void go(page_t page, int selected)
@@ -281,8 +310,8 @@ static void process_event(const app_event_t *event)
             s_find_sender[0] = 0;
             s_ignore_key_until_release = event->button_event == BSP_BTN_PRESS;
             s_ignore_ring_click = event->button_event == BSP_BTN_PRESS;
+            set_find_overlay_visible(false);
             set_message("已告诉" KP_PEER_LABEL "：我在这里", false);
-            render();
             return;
         }
         if (s_ignore_key_until_release) {
@@ -407,7 +436,7 @@ static void process_event(const app_event_t *event)
 }
 static void ui_task(void *arg)
 {
-    (void)arg; render(); ESP_LOGI(TAG, "UI启动 stack high-water=%u", (unsigned)uxTaskGetStackHighWaterMark(NULL));
+    (void)arg; ui_app_init(); render(); ESP_LOGI(TAG, "UI启动 stack high-water=%u", (unsigned)uxTaskGetStackHighWaterMark(NULL));
     app_event_t event; int64_t next_game_tick = 0;
     for (;;) {
         if (xQueueReceive(app_events_queue(), &event, pdMS_TO_TICKS(100)) == pdTRUE) {
@@ -449,6 +478,7 @@ static void ui_task(void *arg)
             s_find_flash = false;
             s_find_sender[0] = 0;
             s_find_status[0] = 0;
+            set_find_overlay_visible(false);
             ESP_LOGI(TAG, "Find 被叫响铃已在30秒后自动停止，不发送ACK");
             render();
         }
@@ -460,7 +490,7 @@ static void ui_task(void *arg)
             if (s_find_overlay && bsp_lvgl_lock(100)) {
                 ui_common_find_overlay_tint(s_find_overlay, s_find_flash);
                 bsp_lvgl_unlock();
-            } else render();
+            }
         }
         if (s_lottery_animating && now >= s_lottery_reveal_at) {
             s_lottery_animating = false;
