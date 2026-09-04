@@ -50,6 +50,7 @@
 - 同步更新索引：`docs/software-design/README.md`、`README.en_US.md` / `README.zh_CN.md` 的 `docs/` 目录说明。
 - 参考 cindy 仓库文档组织完善索引：新增 `docs/README.md` 根总索引；AGENTS.md 规则索引按触发场景改写（附触发条件）；`docs/contribution/` 与 `docs/development/` 的 README 补充收录标准。
 - 引入社区治理文档（参照 cindy 改写，放仓库根目录）：新增 `CONTRIBUTING.md` / `.zh_CN.md`（贡献指南，针对 ESP-IDF/AI agent/fork 场景改写）、`CODE_OF_CONDUCT.md` / `.zh_CN.md`（贡献者公约）、`SECURITY.md` / `.zh_CN.md`（安全报告流程）、`SUPPORT.md` / `.zh_CN.md`（支持渠道）；AGENTS.md 与 docs/README.md 同步引用。
+- 儿童积分固件在 60 秒无操作后进入 Light Sleep；GPIO0 三键或 ESP-NOW 找人/游戏邀请均可唤醒，远程邀请会恢复屏幕并播放提示音。
 - 抢答器游戏新增 F1 风格声音倒计时：三盏红灯逐盏亮起时分别发出提示音，全部熄灭进入 GO 时播放更短促、更高频的开始音。
 - 将对讲可用的空闲堆内存阈值从 80 KB 下调到 70 KB，使内存较紧张时仍可发起对讲。
 - 新增两台 AI Passport 的“抢答器”游戏：复用 ESP-NOW 配对/邀请模式，通过 NTP-like 时钟偏移采样、Host 绝对时间线、按键按下时间戳和带 ACK 的 Host 裁决，实现三灯倒计时、Host 随机 GO 延迟、抢跑判负、平局与超时处理，且不联动积分；串口截图新增无 ESP-NOW 副作用的 `BUZZER`、`BUZZER_ARMED`、`BUZZER_GO` 和 `BUZZER_RESULT` 调试预览。

@@ -41,7 +41,7 @@ idf_component_register(
                 "assets/rps_official/scissors_54x72.rgb565"
                 "assets/rps_official/paper_54x72.rgb565"
     INCLUDE_DIRS "." "ui" "sound" "fonts" "assets" "interaction"
-    REQUIRES bsp esp_driver_usb_serial_jtag esp_event esp_hw_support esp_netif esp_timer esp_wifi json lwip mqtt nvs_flash vfs
+    REQUIRES bsp esp_driver_gpio esp_driver_usb_serial_jtag esp_event esp_hw_support esp_netif esp_pm esp_timer esp_wifi json lwip mqtt nvs_flash vfs
 )
 target_compile_definitions(${COMPONENT_LIB} PRIVATE LV_LVGL_H_INCLUDE_SIMPLE)
 target_link_libraries(${COMPONENT_LIB} PRIVATE m)
