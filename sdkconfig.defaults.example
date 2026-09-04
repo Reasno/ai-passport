@@ -39,6 +39,11 @@ CONFIG_LV_MEM_SIZE_KILOBYTES=24
 
 # --- 系统 ---
 CONFIG_FREERTOS_HZ=1000
+# 60 秒无操作后允许 FreeRTOS tickless idle 自动进入 Light Sleep。
+CONFIG_PM_ENABLE=y
+CONFIG_FREERTOS_USE_TICKLESS_IDLE=y
+# 离开家庭 AP 后仍允许 ESP-NOW 按接收窗口周期唤醒设备。
+CONFIG_ESP_WIFI_STA_DISCONNECTED_PM_ENABLE=y
 
 # --- Bluetooth LE ---
 # 应用固件的配对、游戏、雷达和响铃均使用 ESP-NOW；永久 Recovery 分区

@@ -6,6 +6,8 @@
 
 ## Unreleased
 
+- Added automatic Light Sleep after 60 seconds of inactivity. GPIO0 keys and ESP-NOW find/game invitations wake the device; remote invitations restore the display and play an alert.
+
 - Added an F1-style audible countdown to the buzzer game: each red light now beeps as it illuminates, followed by a shorter, higher-pitched GO beep when all lights go out.
 
 - Lowered the push-to-talk availability threshold from 80 KB to 70 KB of free heap so invitations remain usable under tighter memory conditions.

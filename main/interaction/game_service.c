@@ -15,7 +15,8 @@
 #define INVITE_TIMEOUT_MS 15000
 #define CHOICE_TIMEOUT_MS 20000
 #define RPS_COUNTDOWN_SECONDS 1
-#define RPS_RETRY_MS 400
+/* 350 ms shifts phase against the 100 ms ESP-NOW Light Sleep receive interval. */
+#define RPS_RETRY_MS 350
 #define RADAR_LOST_MS 5000
 
 static const char *TAG = "kp_game";
