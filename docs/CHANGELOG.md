@@ -53,6 +53,7 @@
 - Updated software-design and project README references for the new documentation structure.
 - Added the documentation catalog and task-triggered routing based on the earlier repository model.
 - Added bilingual contribution, code-of-conduct, security, and support documents tailored to this ESP-IDF and fork workflow.
+- Capped codec output volume at 85% to reduce speaker clipping at maximum volume.
 - Added automatic Light Sleep after 60 seconds of inactivity. GPIO0 keys and ESP-NOW find/game invitations wake the device; remote invitations restore the display and play an alert.
 - Added an F1-style audible countdown to the buzzer game: each red light now beeps as it illuminates, followed by a shorter, higher-pitched GO beep when all lights go out.
 - Lowered the push-to-talk availability threshold from 80 KB to 70 KB of free heap so invitations remain usable under tighter memory conditions.

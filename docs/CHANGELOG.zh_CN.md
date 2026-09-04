@@ -50,6 +50,7 @@
 - 同步更新索引：`docs/software-design/README.md`、`README.en_US.md` / `README.zh_CN.md` 的 `docs/` 目录说明。
 - 参考 cindy 仓库文档组织完善索引：新增 `docs/README.md` 根总索引；AGENTS.md 规则索引按触发场景改写（附触发条件）；`docs/contribution/` 与 `docs/development/` 的 README 补充收录标准。
 - 引入社区治理文档（参照 cindy 改写，放仓库根目录）：新增 `CONTRIBUTING.md` / `.zh_CN.md`（贡献指南，针对 ESP-IDF/AI agent/fork 场景改写）、`CODE_OF_CONDUCT.md` / `.zh_CN.md`（贡献者公约）、`SECURITY.md` / `.zh_CN.md`（安全报告流程）、`SUPPORT.md` / `.zh_CN.md`（支持渠道）；AGENTS.md 与 docs/README.md 同步引用。
+- 将 codec 输出音量上限设为 85%，减少最大音量下的扬声器破音。
 - 儿童积分固件在 60 秒无操作后进入 Light Sleep；GPIO0 三键或 ESP-NOW 找人/游戏邀请均可唤醒，远程邀请会恢复屏幕并播放提示音。
 - 抢答器游戏新增 F1 风格声音倒计时：三盏红灯逐盏亮起时分别发出提示音，全部熄灭进入 GO 时播放更短促、更高频的开始音。
 - 将对讲可用的空闲堆内存阈值从 80 KB 下调到 70 KB，使内存较紧张时仍可发起对讲。

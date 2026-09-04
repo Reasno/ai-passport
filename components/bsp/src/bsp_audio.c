@@ -299,6 +299,9 @@ static void audio_cleanup(void) {
     s_ch = 0;
 }
 
+// Keep 15% headroom below the codec's software maximum to avoid speaker clipping.
+#define BSP_AUDIO_SAFE_MAX_VOLUME 85
+
 static esp_err_t i2s_full_duplex_init(void) {
     i2s_chan_config_t chan = {
         .id = BSP_I2S_PORT,
@@ -565,6 +568,7 @@ esp_err_t bsp_audio_read(void *pcm, size_t bytes) {
 }
 
 void bsp_audio_set_volume(uint8_t percent) {
-    s_volume = percent > 100 ? 100 : percent;
+    if (percent > BSP_AUDIO_SAFE_MAX_VOLUME) percent = BSP_AUDIO_SAFE_MAX_VOLUME;
+    s_volume = percent;
     if (s_dev && s_opened && !s_sleeping) esp_codec_dev_set_out_vol(s_dev, s_volume);
 }
