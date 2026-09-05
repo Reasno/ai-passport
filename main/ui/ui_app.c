@@ -307,7 +307,7 @@ static void handle_short_key(bsp_btn_t key)
                 else mole_game_service_client_input(MOLE_INPUT_RELOAD);
             }
         } else if ((mole->phase == MOLE_PHASE_IDLE || mole->phase == MOLE_PHASE_RESULT) &&
-                   mole->is_host && key == BSP_BTN_OK) {
+                   key == BSP_BTN_OK) {
             mole_game_service_begin_session();
         }
     }
