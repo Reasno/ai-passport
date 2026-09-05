@@ -16,6 +16,8 @@
 #define KEY_RPS_LOSSES "rps_loss_u32"
 #define KEY_BUZZER_WINS "buz_win_u32"
 #define KEY_BUZZER_LOSSES "buz_loss_u32"
+#define KEY_MOLE_WINS "mole_win_u32"
+#define KEY_MOLE_LOSSES "mole_loss_u32"
 static const char *TAG = "kp_cache";
 /* NVS serialization runs in the UI task; avoid a ~2 KB automatic object there. */
 static app_model_snapshot_t s_cache_model;
@@ -107,6 +109,29 @@ esp_err_t nvs_cache_save_rps_stats(uint32_t wins, uint32_t losses)
 esp_err_t nvs_cache_save_buzzer_stats(uint32_t wins, uint32_t losses)
 {
     return save_game_stats(KEY_BUZZER_WINS, KEY_BUZZER_LOSSES, wins, losses);
+}
+
+esp_err_t nvs_cache_load_mole_stats(uint32_t *wins, uint32_t *losses)
+{
+    if (!wins || !losses) return ESP_ERR_INVALID_ARG;
+    *wins = *losses = 0;
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(NS, NVS_READONLY, &h);
+    if (err == ESP_ERR_NVS_NOT_FOUND) return ESP_OK;
+    if (err != ESP_OK) return err;
+    err = nvs_get_u32(h, KEY_MOLE_WINS, wins);
+    if (err == ESP_ERR_NVS_NOT_FOUND) { *wins = 0; err = ESP_OK; }
+    if (err == ESP_OK) {
+        err = nvs_get_u32(h, KEY_MOLE_LOSSES, losses);
+        if (err == ESP_ERR_NVS_NOT_FOUND) { *losses = 0; err = ESP_OK; }
+    }
+    nvs_close(h);
+    return err;
+}
+
+esp_err_t nvs_cache_save_mole_stats(uint32_t wins, uint32_t losses)
+{
+    return save_game_stats(KEY_MOLE_WINS, KEY_MOLE_LOSSES, wins, losses);
 }
 
 esp_err_t nvs_cache_save_model(void)
