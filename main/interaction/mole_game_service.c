@@ -10,7 +10,7 @@
 #include <string.h>
 
 #define MOLE_PROTOCOL_VERSION 1U
-#define MOLE_DURATION_MS 20000
+#define MOLE_DURATION_MS 30000
 #define MOLE_PERIOD_MS 3000
 #define MOLE_COUNTDOWN_MS 3000
 #define MOLE_TARGET_HITS 5
@@ -221,7 +221,7 @@ esp_err_t mole_game_service_start(void)
 {
     if (!s_lock) s_lock = xSemaphoreCreateMutex();
     if (!s_lock) return ESP_ERR_NO_MEM;
-    enter_idle_locked(local_is_host() ? "哥哥发起游戏" : "等待哥哥邀请");
+    enter_idle_locked(local_is_host() ? "可发起游戏" : "等待对方邀请");
     esp_err_t err = nvs_cache_load_mole_stats(&s_game.wins, &s_game.losses);
     if (err != ESP_OK) ESP_LOGW(TAG, "加载打地鼠战绩失败: %s", esp_err_to_name(err));
     return ESP_OK;
@@ -251,10 +251,10 @@ void mole_game_service_begin_session(void)
     uint16_t session;
     do { session = (uint16_t)esp_random(); } while (session == 0 || session == s_game.session);
     reset_session_locked(true, session);
-    set_status("正在邀请妹妹...");
+    set_status("正在邀请对方...");
     s_invite_deadline = now + MOLE_INVITE_TIMEOUT_MS;
     s_last_state_tx = 0;
-    uint32_t rules = MOLE_PROTOCOL_VERSION | (20U << 8) | (MOLE_TARGET_HITS << 16) | (30U << 24);
+    uint32_t rules = MOLE_PROTOCOL_VERSION | (30U << 8) | (MOLE_TARGET_HITS << 16) | (30U << 24);
     espnow_service_send_data(ESPNOW_MSG_MOLE_INVITE, s_game.session, 0, rules);
     s_last_state_tx = now;
     xSemaphoreGive(s_lock);
@@ -311,7 +311,7 @@ void mole_game_service_cancel(void)
         for (int i = 0; i < 3; ++i)
             espnow_service_send_data(ESPNOW_MSG_MOLE_CANCEL, s_game.session, 0, 1U);
     }
-    enter_idle_locked(local_is_host() ? "哥哥发起游戏" : "等待哥哥邀请");
+    enter_idle_locked(local_is_host() ? "可发起游戏" : "等待对方邀请");
     xSemaphoreGive(s_lock);
     notify();
 }
@@ -326,7 +326,7 @@ void mole_game_service_tick(int64_t now)
     s_game.paired = espnow_service_has_peer();
     if (s_game.is_host && s_game.phase == MOLE_PHASE_IDLE && s_game.session != 0 &&
         now < s_invite_deadline && now - s_last_state_tx >= MOLE_INVITE_RETRY_MS) {
-        uint32_t rules = MOLE_PROTOCOL_VERSION | (20U << 8) | (MOLE_TARGET_HITS << 16) | (30U << 24);
+        uint32_t rules = MOLE_PROTOCOL_VERSION | (30U << 8) | (MOLE_TARGET_HITS << 16) | (30U << 24);
         espnow_service_send_data(ESPNOW_MSG_MOLE_INVITE, s_game.session, 0, rules);
         s_last_state_tx = now;
     }
@@ -420,7 +420,7 @@ void mole_game_service_on_packet(const uint8_t src[6], const espnow_game_packet_
             reset_session_locked(false, p->session);
             s_game.phase = MOLE_PHASE_COUNTDOWN;
             s_countdown_deadline = now + MOLE_COUNTDOWN_MS;
-            set_status("已接受，等待哥哥开始");
+            set_status("已接受，等待对方开始");
             changed = true;
         }
         s_last_peer_rx = now;
