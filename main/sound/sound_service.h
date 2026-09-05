@@ -10,6 +10,9 @@ typedef enum {
     SOUND_FANFARE,
     SOUND_FIND_RING,
     SOUND_BUZZER_GO,
+    SOUND_MOLE_RELOAD,
+    SOUND_MOLE_SHOOT,
+    SOUND_MOLE_HIT,
 } sound_effect_t;
 esp_err_t sound_service_start(void);
 void sound_service_play(sound_effect_t effect);

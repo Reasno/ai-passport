@@ -287,6 +287,8 @@ typedef struct {
     lv_obj_t *ammo;
     lv_obj_t *mole;
     lv_obj_t *reticle;
+    lv_obj_t *hit_fx;
+    lv_timer_t *hit_fx_timer;
     lv_obj_t *phase_box;
     lv_obj_t *phase_title;
     lv_obj_t *phase_detail;
@@ -337,6 +339,31 @@ static void mole_create_grid(lv_obj_t *screen)
     mole_rect(s_mole_ui.reticle, 0, 49, 16, 3, rc); mole_rect(s_mole_ui.reticle, 0, 36, 3, 16, rc);
     mole_rect(s_mole_ui.reticle, 36, 49, 16, 3, rc); mole_rect(s_mole_ui.reticle, 49, 36, 3, 16, rc);
     mole_rect(s_mole_ui.reticle, 24, 24, 4, 4, rc);
+
+    s_mole_ui.hit_fx = mole_group(grid, 56, 56);
+    lv_obj_t *flash = mole_rect(s_mole_ui.hit_fx, 6, 6, 44, 44, 0xFF5A36);
+    lv_obj_set_style_radius(flash, LV_RADIUS_CIRCLE, 0);
+    mole_rect(s_mole_ui.hit_fx, 2, 25, 52, 6, 0xFFD84A);
+    mole_rect(s_mole_ui.hit_fx, 25, 2, 6, 52, 0xFFD84A);
+    lv_obj_t *spark = mole_rect(s_mole_ui.hit_fx, 18, 18, 20, 20, 0xFFF4C2);
+    lv_obj_set_style_radius(spark, LV_RADIUS_CIRCLE, 0);
+    lv_obj_add_flag(s_mole_ui.hit_fx, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void mole_hit_fx_timer_cb(lv_timer_t *timer)
+{
+    if (s_mole_ui.hit_fx) lv_obj_add_flag(s_mole_ui.hit_fx, LV_OBJ_FLAG_HIDDEN);
+    s_mole_ui.hit_fx_timer = NULL;
+    lv_timer_delete(timer);
+}
+
+static void mole_show_hit_fx(uint8_t cell)
+{
+    if (!s_mole_ui.hit_fx || cell >= 9) return;
+    lv_obj_set_pos(s_mole_ui.hit_fx, (cell % 3) * 66 + 5, (cell / 3) * 66 + 5);
+    lv_obj_remove_flag(s_mole_ui.hit_fx, LV_OBJ_FLAG_HIDDEN);
+    if (s_mole_ui.hit_fx_timer) lv_timer_reset(s_mole_ui.hit_fx_timer);
+    else s_mole_ui.hit_fx_timer = lv_timer_create(mole_hit_fx_timer_cb, 400, NULL);
 }
 
 static void mole_set_label(lv_obj_t *label, const char *text)
@@ -354,6 +381,8 @@ void ui_mole_update(const mole_game_snapshot_t *game)
     if (first || old->hits != game->hits) {
         snprintf(text, sizeof(text), "命中 %u/5", game->hits);
         mole_set_label(s_mole_ui.hits, text);
+        if (!first && game->is_host && game->hits > old->hits)
+            mole_show_hit_fx(old->mole_cell);
     }
     if (first || old->remaining_ds != game->remaining_ds) {
         snprintf(text, sizeof(text), "%u.%us", game->remaining_ds / 10, game->remaining_ds % 10);
@@ -381,10 +410,15 @@ void ui_mole_update(const mole_game_snapshot_t *game)
         const char *footer = game->is_host ? "B1上 B2下 B3开枪" : "B1左 B2右 B3换弹";
         uint32_t border = KP_YELLOW;
         if (game->phase == MOLE_PHASE_IDLE) {
-            title = game->is_host ? "上下瞄准并开枪" : "左右瞄准并换弹";
-            snprintf(text, sizeof(text), "%s  %lu胜 %lu负", game->status,
-                     (unsigned long)game->wins, (unsigned long)game->losses);
-            detail = text;
+            if (strcmp(game->status, "连接超时，请重试") == 0) {
+                title = "连接超时";
+                detail = "B3 重试";
+            } else {
+                title = game->is_host ? "上下瞄准并开枪" : "左右瞄准并换弹";
+                snprintf(text, sizeof(text), "%s  %lu胜 %lu负", game->status,
+                         (unsigned long)game->wins, (unsigned long)game->losses);
+                detail = text;
+            }
             footer = "B3开始邀请  长按B1主页";
         } else if (game->phase == MOLE_PHASE_INVITE_SENT) {
             title = "已发送邀请";
@@ -406,7 +440,7 @@ void ui_mole_update(const mole_game_snapshot_t *game)
             detail = game->status;
             border = game->result == MOLE_RESULT_WIN ? KP_GREEN :
                      game->result == MOLE_RESULT_LOSE ? KP_RED : KP_YELLOW;
-            footer = "B3 再试一次  长按B1主页";
+            footer = "B3再来一次  长按B1主页";
         }
         if (game->phase == MOLE_PHASE_PLAYING) lv_obj_add_flag(s_mole_ui.phase_box, LV_OBJ_FLAG_HIDDEN);
         else {
@@ -443,5 +477,6 @@ lv_obj_t *ui_mole_build(const app_model_snapshot_t *model, const mole_game_snaps
 
 void ui_mole_forget(void)
 {
+    if (s_mole_ui.hit_fx_timer) lv_timer_delete(s_mole_ui.hit_fx_timer);
     memset(&s_mole_ui, 0, sizeof(s_mole_ui));
 }
