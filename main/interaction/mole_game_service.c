@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MOLE_PROTOCOL_VERSION 2U
+#define MOLE_PROTOCOL_VERSION 3U
 #define MOLE_DURATION_MS 30000
 #define MOLE_PERIOD_MS 3000
 #define MOLE_COUNTDOWN_MS 3000
@@ -33,6 +33,7 @@ static int64_t s_mole_deadline;
 static int64_t s_invite_deadline;
 static int64_t s_last_peer_rx;
 static int64_t s_last_state_tx;
+static int64_t s_last_accept_tx;
 static int64_t s_last_input_ms;
 static int64_t s_result_retry_until;
 static uint16_t s_state_sequence;
@@ -65,7 +66,7 @@ static void set_status(const char *text)
 {
     strlcpy(s_game.status, text, sizeof(s_game.status));
 }
-static uint8_t remaining_ds(int64_t now)
+static uint16_t remaining_ds(int64_t now)
 {
     int64_t deadline = 0;
     if (s_game.phase == MOLE_PHASE_INVITE_SENT || s_game.phase == MOLE_PHASE_INVITE_RECEIVED) deadline = s_invite_deadline;
@@ -73,7 +74,7 @@ static uint8_t remaining_ds(int64_t now)
     else if (s_game.phase == MOLE_PHASE_PLAYING) deadline = s_play_deadline;
     if (deadline <= now) return 0;
     int64_t ds = (deadline - now + 99) / 100;
-    return ds > 200 ? 200 : (uint8_t)ds;
+    return ds > 511 ? 511 : (uint16_t)ds;
 }
 static uint8_t phase_to_wire(mole_phase_t phase)
 {
@@ -101,8 +102,8 @@ static uint32_t pack_state(int64_t now)
     data |= (uint32_t)(s_game.ammo_loaded ? 1U : 0U) << 10;
     data |= (uint32_t)(s_game.hits & 0x07) << 11;
     data |= (uint32_t)(s_game.result & 0x03) << 14;
-    data |= (uint32_t)remaining_ds(now) << 16;
-    data |= (uint32_t)s_game.mole_generation << 24;
+    data |= (uint32_t)(remaining_ds(now) & 0x01ffU) << 16;
+    data |= (uint32_t)(s_game.mole_generation & 0x7fU) << 25;
     return data;
 }
 static void send_state_locked(int64_t now, bool new_revision, bool critical)
@@ -146,6 +147,7 @@ static void reset_session_locked(bool host, uint16_t session)
     s_has_state_sequence = false;
     s_has_client_input_sequence = false;
     s_last_peer_rx = 0;
+    s_last_accept_tx = 0;
     s_last_input_ms = 0;
     s_critical_sequence = 0;
     s_critical_acked = false;
@@ -281,10 +283,13 @@ void mole_game_service_respond_invite(bool accept)
         return;
     }
     if (accept) {
+        int64_t now = monotonic_ms();
         s_game.phase = MOLE_PHASE_COUNTDOWN;
-        s_countdown_deadline = monotonic_ms() + MOLE_COUNTDOWN_MS;
+        s_countdown_deadline = now + MOLE_COUNTDOWN_MS;
         set_status("已接受，等待开始");
         espnow_service_send_data(ESPNOW_MSG_MOLE_ACCEPT, s_game.session, 0, MOLE_PROTOCOL_VERSION);
+        s_last_accept_tx = now;
+        ESP_LOGI(TAG, "tx ACCEPT session=%u", s_game.session);
     } else {
         espnow_service_send_data(ESPNOW_MSG_MOLE_REJECT, s_game.session, 0, 0);
         enter_idle_locked("已拒绝邀请");
@@ -355,12 +360,18 @@ void mole_game_service_tick(int64_t now)
     bool settle = false;
     uint32_t wins = 0, losses = 0;
     xSemaphoreTake(s_lock, portMAX_DELAY);
-    uint8_t previous_remaining_ds = s_game.remaining_ds;
+    uint16_t previous_remaining_ds = s_game.remaining_ds;
     s_game.paired = espnow_service_has_peer();
     if (s_game.phase == MOLE_PHASE_INVITE_SENT && now - s_last_state_tx >= MOLE_INVITE_RETRY_MS) {
         uint32_t rules = MOLE_PROTOCOL_VERSION | (30U << 8) | (MOLE_TARGET_HITS << 16) | (30U << 24);
         espnow_service_send_data(ESPNOW_MSG_MOLE_INVITE, s_game.session, 0, rules);
         s_last_state_tx = now;
+    }
+    if (!s_game.is_host && s_game.phase == MOLE_PHASE_COUNTDOWN && !s_has_state_sequence &&
+        now - s_last_accept_tx >= MOLE_RETRY_MS) {
+        espnow_service_send_data(ESPNOW_MSG_MOLE_ACCEPT, s_game.session, 0, MOLE_PROTOCOL_VERSION);
+        s_last_accept_tx = now;
+        ESP_LOGI(TAG, "retry ACCEPT session=%u", s_game.session);
     }
     if ((s_game.phase == MOLE_PHASE_INVITE_SENT || s_game.phase == MOLE_PHASE_INVITE_RECEIVED) && now >= s_invite_deadline) {
         enter_idle_locked("连接超时，请重试");
@@ -470,16 +481,23 @@ void mole_game_service_on_packet(const uint8_t src[6], const espnow_game_packet_
     } else {
         s_last_peer_rx = now;
         s_game.peer_connected = true;
-        if (p->type == ESPNOW_MSG_MOLE_ACCEPT && s_game.is_host && s_game.phase == MOLE_PHASE_INVITE_SENT) {
-            s_game.phase = MOLE_PHASE_COUNTDOWN;
-            s_game.reticle_cell = 4;
-            s_game.hits = 0;
-            s_game.ammo_loaded = true;
-            s_game.mole_generation = 0;
-            s_countdown_deadline = now + MOLE_COUNTDOWN_MS;
-            set_status("准备：3");
-            send_state_locked(now, true, true);
-            changed = true;
+        if (p->type == ESPNOW_MSG_MOLE_ACCEPT && s_game.is_host &&
+            (data & 0xffU) == MOLE_PROTOCOL_VERSION &&
+            (s_game.phase == MOLE_PHASE_INVITE_SENT || s_game.phase == MOLE_PHASE_COUNTDOWN)) {
+            ESP_LOGI(TAG, "rx ACCEPT session=%u phase=%u", p->session, (unsigned)s_game.phase);
+            if (s_game.phase == MOLE_PHASE_COUNTDOWN) {
+                send_state_locked(now, false, true);
+            } else {
+                s_game.phase = MOLE_PHASE_COUNTDOWN;
+                s_game.reticle_cell = 4;
+                s_game.hits = 0;
+                s_game.ammo_loaded = true;
+                s_game.mole_generation = 0;
+                s_countdown_deadline = now + MOLE_COUNTDOWN_MS;
+                set_status("准备：3");
+                send_state_locked(now, true, true);
+                changed = true;
+            }
         } else if (p->type == ESPNOW_MSG_MOLE_REJECT && s_game.is_host && s_game.phase == MOLE_PHASE_INVITE_SENT) {
             enter_idle_locked("对方拒绝了邀请");
             changed = true;
@@ -511,8 +529,8 @@ void mole_game_service_on_packet(const uint8_t src[6], const espnow_game_packet_
                 s_game.ammo_loaded = ((data >> 10) & 1U) != 0;
                 s_game.hits = (uint8_t)((data >> 11) & 0x07U);
                 s_game.result = (mole_result_t)((data >> 14) & 0x03U);
-                s_game.remaining_ds = (uint8_t)((data >> 16) & 0xffU);
-                s_game.mole_generation = (uint8_t)(data >> 24);
+                s_game.remaining_ds = (uint16_t)((data >> 16) & 0x01ffU);
+                s_game.mole_generation = (uint8_t)(data >> 25);
                 if (s_game.phase == MOLE_PHASE_COUNTDOWN)
                     s_countdown_deadline = now + (int64_t)s_game.remaining_ds * 100;
                 else if (s_game.phase == MOLE_PHASE_PLAYING)
