@@ -42,6 +42,7 @@ idf_component_register(
     EMBED_FILES "assets/rps_official/rock_54x72.rgb565"
                 "assets/rps_official/scissors_54x72.rgb565"
                 "assets/rps_official/paper_54x72.rgb565"
+                "assets/mole/mole_54x72.rgb565"
     INCLUDE_DIRS "." "ui" "sound" "fonts" "assets" "interaction"
     REQUIRES bsp esp_driver_gpio esp_driver_usb_serial_jtag esp_event esp_hw_support esp_netif esp_pm esp_timer esp_wifi json lwip mqtt nvs_flash vfs
 )

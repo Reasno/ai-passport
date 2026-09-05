@@ -16,6 +16,7 @@
 extern const uint8_t rps_rock_data[] asm("_binary_rock_54x72_rgb565_start");
 extern const uint8_t rps_scissors_data[] asm("_binary_scissors_54x72_rgb565_start");
 extern const uint8_t rps_paper_data[] asm("_binary_paper_54x72_rgb565_start");
+extern const uint8_t mole_logo_data[] asm("_binary_mole_54x72_rgb565_start");
 
 #define RPS_IMAGE(name, data_ptr) \
     static const lv_image_dsc_t name = { \
@@ -32,6 +33,7 @@ extern const uint8_t rps_paper_data[] asm("_binary_paper_54x72_rgb565_start");
 RPS_IMAGE(s_rps_rock, rps_rock_data);
 RPS_IMAGE(s_rps_scissors, rps_scissors_data);
 RPS_IMAGE(s_rps_paper, rps_paper_data);
+RPS_IMAGE(s_mole_logo, mole_logo_data);
 
 static void rps_choice_card(lv_obj_t *screen, int x, const lv_image_dsc_t *image_source,
                             const char *label, bool selected)
@@ -53,14 +55,22 @@ static void rps_choice_card(lv_obj_t *screen, int x, const lv_image_dsc_t *image
 }
 
 static void game_card(lv_obj_t *screen, int y, bool selected, bool enabled, ui_pixel_icon_t icon,
-                      const char *title, const char *detail)
+                      const lv_image_dsc_t *art, const char *title, const char *detail)
 {
     lv_obj_t *card = ui_common_card(screen, 12, y, 216, 52, selected, enabled);
-    lv_obj_t *image = icon == UI_PIXEL_ICON_RADAR
-                          ? ui_radar_icon_create(card, 0, 0, enabled ? KP_THEME : KP_MUTED, 3)
-                      : icon == UI_PIXEL_ICON_BUZZER
-                          ? ui_buzzer_icon_create(card, 0, 0, enabled, 3)
-                          : ui_pixel_icon_create(card, icon, 0, 0, enabled ? KP_THEME : KP_MUTED, 3);
+    lv_obj_t *image;
+    if (art) {
+        image = lv_image_create(card);
+        lv_image_set_src(image, art);
+        lv_image_set_scale(image, 128);
+        lv_image_set_antialias(image, false);
+    } else {
+        image = icon == UI_PIXEL_ICON_RADAR
+                    ? ui_radar_icon_create(card, 0, 0, enabled ? KP_THEME : KP_MUTED, 3)
+                : icon == UI_PIXEL_ICON_BUZZER
+                    ? ui_buzzer_icon_create(card, 0, 0, enabled, 3)
+                    : ui_pixel_icon_create(card, icon, 0, 0, enabled ? KP_THEME : KP_MUTED, 3);
+    }
     if (image) lv_obj_align(image, LV_ALIGN_LEFT_MID, 14, 0);
     ui_common_label(card, title, 56, 2, 148, LV_TEXT_ALIGN_LEFT, false);
     lv_obj_t *d = ui_common_label_small(card, detail, 56, 28, 148, LV_TEXT_ALIGN_LEFT);
@@ -77,13 +87,13 @@ lv_obj_t *ui_games_build(const app_model_snapshot_t *model, const game_snapshot_
     const char *find_detail = game->paired ? "响铃和近距离信号"
                               : model->mqtt_online ? "仅WiFi响铃 无测距" : "请先完成配对";
     game_card(screen, 39, selected == 0, game_service_heap_allows_radar() && find_ready,
-              UI_PIXEL_ICON_RADAR, "找" KP_PEER_LABEL, find_detail);
+              UI_PIXEL_ICON_RADAR, NULL, "找" KP_PEER_LABEL, find_detail);
     game_card(screen, 93, selected == 1, game_service_heap_allows_rps() && game->paired,
-              UI_PIXEL_ICON_RPS, "石头剪刀布", game->paired ? "纯娱乐 不增减积分" : "请先完成配对");
+              UI_PIXEL_ICON_RPS, NULL, "石头剪刀布", game->paired ? "纯娱乐 不增减积分" : "请先完成配对");
     game_card(screen, 147, selected == 2, game_service_heap_allows_rps() && game->paired,
-              UI_PIXEL_ICON_BUZZER, "抢答器", game->paired ? "B3 抢答 纯娱乐" : "请先完成配对");
+              UI_PIXEL_ICON_BUZZER, NULL, "抢答器", game->paired ? "B3 抢答 纯娱乐" : "请先完成配对");
     game_card(screen, 201, selected == 3, game_service_heap_allows_rps() && game->paired,
-              UI_PIXEL_ICON_RPS, "打地鼠", game->paired ? "哥哥瞄准 妹妹换弹" : "请先完成配对");
+              UI_PIXEL_ICON_RPS, &s_mole_logo, "打地鼠", game->paired ? "合作瞄准并换弹" : "请先完成配对");
     char heap[48]; snprintf(heap, sizeof(heap), "可用内存 %lu KB", (unsigned long)(esp_get_free_heap_size() / 1024));
     lv_obj_t *h = ui_common_label_small(screen, heap, 12, 258, 216, LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_text_color(h, lv_color_hex(KP_MUTED), 0);
@@ -335,9 +345,9 @@ void ui_mole_update(const mole_game_snapshot_t *game)
         mole_set_label(s_mole_ui.timer, text);
     }
     if (first || old->is_host != game->is_host)
-        mole_set_label(s_mole_ui.role, game->is_host ? "哥哥 上下瞄准" : "妹妹 左右瞄准");
+        mole_set_label(s_mole_ui.role, game->is_host ? "上下瞄准并开枪" : "左右瞄准并换弹");
     if (first || old->ammo_loaded != game->ammo_loaded) {
-        mole_set_label(s_mole_ui.ammo, game->ammo_loaded ? "弹夹 ●" : "待换弹 ○");
+        mole_set_label(s_mole_ui.ammo, game->ammo_loaded ? "弹夹已装" : "待换弹");
         lv_obj_set_style_text_color(s_mole_ui.ammo,
                                    lv_color_hex(game->ammo_loaded ? KP_GREEN : KP_RED), 0);
     }
@@ -356,7 +366,7 @@ void ui_mole_update(const mole_game_snapshot_t *game)
         const char *footer = game->is_host ? "B1上 B2下 B3开枪" : "B1左 B2右 B3换弹";
         uint32_t border = KP_YELLOW;
         if (game->phase == MOLE_PHASE_IDLE) {
-            title = game->is_host ? "哥哥：上下瞄准并开枪" : "妹妹：左右瞄准并换弹";
+            title = game->is_host ? "上下瞄准并开枪" : "左右瞄准并换弹";
             snprintf(text, sizeof(text), "%s  %lu胜 %lu负", game->status,
                      (unsigned long)game->wins, (unsigned long)game->losses);
             detail = text;
@@ -365,7 +375,7 @@ void ui_mole_update(const mole_game_snapshot_t *game)
             static char countdown[24];
             snprintf(countdown, sizeof(countdown), "准备 %u", (game->remaining_ds + 9) / 10);
             title = countdown;
-            detail = "20秒内合作击中5只";
+            detail = "30秒内合作击中5只";
             footer = "准备开始  长按B1主页";
         } else if (game->phase == MOLE_PHASE_RESULT) {
             title = game->result == MOLE_RESULT_WIN ? "胜利！" :
@@ -373,7 +383,7 @@ void ui_mole_update(const mole_game_snapshot_t *game)
             detail = game->status;
             border = game->result == MOLE_RESULT_WIN ? KP_GREEN :
                      game->result == MOLE_RESULT_LOSE ? KP_RED : KP_YELLOW;
-            footer = game->is_host ? "B3再来一局 长按B1主页" : "等待哥哥 长按B1主页";
+            footer = game->is_host ? "B3再来一局 长按B1主页" : "等待对方 长按B1主页";
         }
         if (game->phase == MOLE_PHASE_PLAYING) lv_obj_add_flag(s_mole_ui.phase_box, LV_OBJ_FLAG_HIDDEN);
         else {
