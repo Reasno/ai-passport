@@ -379,7 +379,7 @@ void ui_mole_update(const mole_game_snapshot_t *game)
     char text[128];
 
     if (first || old->hits != game->hits) {
-        snprintf(text, sizeof(text), "命中 %u/5", game->hits);
+        snprintf(text, sizeof(text), "命中 %u/3", game->hits);
         mole_set_label(s_mole_ui.hits, text);
         if (!first && game->hits > old->hits)
             mole_show_hit_fx(old->mole_cell);
@@ -432,7 +432,7 @@ void ui_mole_update(const mole_game_snapshot_t *game)
             static char countdown[24];
             snprintf(countdown, sizeof(countdown), "准备 %u", (game->remaining_ds + 9) / 10);
             title = countdown;
-            detail = "30秒内合作击中5只";
+            detail = "30秒内合作击中3只";
             footer = "准备开始  长按B1主页";
         } else if (game->phase == MOLE_PHASE_RESULT) {
             title = game->result == MOLE_RESULT_WIN ? "胜利" :

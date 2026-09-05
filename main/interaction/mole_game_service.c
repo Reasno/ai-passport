@@ -14,7 +14,7 @@
 #define MOLE_DURATION_MS 30000
 #define MOLE_PERIOD_MS 3000
 #define MOLE_COUNTDOWN_MS 3000
-#define MOLE_TARGET_HITS 5
+#define MOLE_TARGET_HITS 3
 #define MOLE_HEARTBEAT_MS 250
 #define MOLE_RETRY_MS 150
 #define MOLE_INVITE_RETRY_MS 400
@@ -393,7 +393,7 @@ void mole_game_service_tick(int64_t now)
         s_game.phase = MOLE_PHASE_PLAYING;
         s_play_deadline = now + MOLE_DURATION_MS;
         s_mole_deadline = now + MOLE_PERIOD_MS;
-        set_status("合作打中 5 只地鼠");
+        set_status("合作打中 3 只地鼠");
         send_state_locked(now, true, true);
         changed = true;
     }
@@ -536,7 +536,7 @@ void mole_game_service_on_packet(const uint8_t src[6], const espnow_game_packet_
                 else if (s_game.phase == MOLE_PHASE_PLAYING)
                     s_play_deadline = now + (int64_t)s_game.remaining_ds * 100;
                 if (s_game.phase == MOLE_PHASE_COUNTDOWN) set_status("准备倒计时");
-                else if (s_game.phase == MOLE_PHASE_PLAYING) set_status("合作打中 5 只地鼠");
+                else if (s_game.phase == MOLE_PHASE_PLAYING) set_status("合作打中 3 只地鼠");
                 else if (s_game.result == MOLE_RESULT_WIN) set_status("合作成功！");
                 else if (s_game.result == MOLE_RESULT_LOSE) set_status("时间到，再试一次");
                 else if (s_game.result == MOLE_RESULT_ABORTED) set_status("连接中断，本局取消");
