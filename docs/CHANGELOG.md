@@ -6,6 +6,8 @@
 
 ## Unreleased
 
+- Regenerated the bundled UI fonts to cover every current Whac-A-Mole label, including the multiplication sign in the cooperative victory count.
+
 - Changed the cooperative Whac-A-Mole victory result to show the device's latest persisted lifetime win count.
 
 - Reduced the cooperative Whac-A-Mole victory target from five hits to three.
