@@ -52,6 +52,21 @@ static void find_ring(void)
         if (round < 2) vTaskDelay(pdMS_TO_TICKS(280));
     }
 }
+static void mole_reload(void)
+{
+    tone(2100, 3200, 55, true, false);
+    vTaskDelay(pdMS_TO_TICKS(25));
+    tone(1350, 2100, 120, true, false);
+}
+static void mole_shoot(void)
+{
+    tone(320, 90, 150, true, false);
+}
+static void mole_hit(void)
+{
+    tone(180, 70, 180, true, false);
+    tone(900, 260, 120, true, false);
+}
 static void sound_task(void *arg)
 {
     (void)arg;
@@ -69,6 +84,9 @@ static void sound_task(void *arg)
         else if (effect == SOUND_DU) tone(200, 200, 150, true, false);
         else if (effect == SOUND_FIND_RING) find_ring();
         else if (effect == SOUND_BUZZER_GO) tone(1600, 1600, 35, true, false);
+        else if (effect == SOUND_MOLE_RELOAD) mole_reload();
+        else if (effect == SOUND_MOLE_SHOOT) mole_shoot();
+        else if (effect == SOUND_MOLE_HIT) mole_hit();
         else { tone(523, 523, 150, false, false); tone(659, 659, 150, false, false); tone(784, 784, 200, false, false); }
         sound_service_audio_unlock();
     }

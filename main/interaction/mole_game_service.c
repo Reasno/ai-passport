@@ -1,6 +1,7 @@
 #include "mole_game_service.h"
 #include "app_events.h"
 #include "nvs_cache.h"
+#include "sound_service.h"
 #include "esp_log.h"
 #include "esp_random.h"
 #include "esp_timer.h"
@@ -208,7 +209,9 @@ static bool apply_host_input_locked(mole_input_t input, int64_t now)
     case MOLE_INPUT_SHOOT:
         if (!s_game.ammo_loaded) return false;
         s_game.ammo_loaded = false;
+        sound_service_play(SOUND_MOLE_SHOOT);
         if (s_game.reticle_cell == s_game.mole_cell) {
+            sound_service_play(SOUND_MOLE_HIT);
             ++s_game.hits;
             if (s_game.hits >= MOLE_TARGET_HITS) {
                 finish_host_locked(MOLE_RESULT_WIN, now);
@@ -330,6 +333,7 @@ void mole_game_service_client_input(mole_input_t input)
     uint32_t data = (uint32_t)wire_action | ((uint32_t)input_sequence << 16);
     for (int i = 0; i < 3; ++i)
         espnow_service_send_data(ESPNOW_MSG_MOLE_INPUT, s_game.session, input_sequence, data);
+    if (input == MOLE_INPUT_RELOAD) sound_service_play(SOUND_MOLE_RELOAD);
     xSemaphoreGive(s_lock);
 }
 void mole_game_service_cancel(void)
