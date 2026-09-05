@@ -17,6 +17,7 @@ idf_component_register(
          "interaction/find_service.c"
          "interaction/game_service.c"
          "interaction/buzzer_game_service.c"
+         "interaction/mole_game_service.c"
          "interaction/ptt_service.c"
          "ui/ui_app.c"
          "ui/ui_common.c"

@@ -71,19 +71,21 @@ lv_obj_t *ui_games_build(const app_model_snapshot_t *model, const game_snapshot_
 {
     lv_obj_t *screen = ui_common_screen("互动游戏", model);
     const char *pair = game->paired ? "已配对 长按B3重配" : "未配对 长按B3配对";
-    ui_common_label_small(screen, pair, 12, 31, 216, LV_TEXT_ALIGN_CENTER);
+    ui_common_label_small(screen, pair, 12, 23, 216, LV_TEXT_ALIGN_CENTER);
     /* Ring works over either transport, so the entry only needs one of them alive. */
     bool find_ready = game->paired || model->mqtt_online;
     const char *find_detail = game->paired ? "响铃和近距离信号"
                               : model->mqtt_online ? "仅WiFi响铃 无测距" : "请先完成配对";
-    game_card(screen, 47, selected == 0, game_service_heap_allows_radar() && find_ready,
+    game_card(screen, 39, selected == 0, game_service_heap_allows_radar() && find_ready,
               UI_PIXEL_ICON_RADAR, "找" KP_PEER_LABEL, find_detail);
-    game_card(screen, 105, selected == 1, game_service_heap_allows_rps() && game->paired,
+    game_card(screen, 93, selected == 1, game_service_heap_allows_rps() && game->paired,
               UI_PIXEL_ICON_RPS, "石头剪刀布", game->paired ? "纯娱乐 不增减积分" : "请先完成配对");
-    game_card(screen, 163, selected == 2, game_service_heap_allows_rps() && game->paired,
+    game_card(screen, 147, selected == 2, game_service_heap_allows_rps() && game->paired,
               UI_PIXEL_ICON_BUZZER, "抢答器", game->paired ? "B3 抢答 纯娱乐" : "请先完成配对");
+    game_card(screen, 201, selected == 3, game_service_heap_allows_rps() && game->paired,
+              UI_PIXEL_ICON_RPS, "双人打地鼠", game->paired ? "哥哥瞄准 妹妹换弹" : "请先完成配对");
     char heap[48]; snprintf(heap, sizeof(heap), "可用内存 %lu KB", (unsigned long)(esp_get_free_heap_size() / 1024));
-    lv_obj_t *h = ui_common_label_small(screen, heap, 12, 222, 216, LV_TEXT_ALIGN_CENTER);
+    lv_obj_t *h = ui_common_label_small(screen, heap, 12, 258, 216, LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_text_color(h, lv_color_hex(KP_MUTED), 0);
     if (game->state == GAME_STATE_PAIRING) ui_common_message(screen, game->status, false);
     ui_common_footer(screen, "B1 B2选择  B3确认  长按B1主页", false);
@@ -236,4 +238,177 @@ lv_obj_t *ui_buzzer_build(const app_model_snapshot_t *model, const buzzer_game_s
     lv_obj_set_style_text_color(h, lv_color_hex(KP_MUTED_LIGHT), 0);
     ui_common_footer(screen, footer, false);
     return screen;
+}
+
+static lv_obj_t *mole_rect(lv_obj_t *parent, int x, int y, int w, int h, uint32_t color)
+{
+    lv_obj_t *obj = lv_obj_create(parent);
+    lv_obj_set_pos(obj, x, y);
+    lv_obj_set_size(obj, w, h);
+    lv_obj_set_style_pad_all(obj, 0, 0);
+    lv_obj_set_style_border_width(obj, 0, 0);
+    lv_obj_set_style_radius(obj, 0, 0);
+    lv_obj_set_style_bg_color(obj, lv_color_hex(color), 0);
+    lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, 0);
+    lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+    return obj;
+}
+
+typedef struct {
+    lv_obj_t *screen;
+    lv_obj_t *hits;
+    lv_obj_t *timer;
+    lv_obj_t *role;
+    lv_obj_t *ammo;
+    lv_obj_t *mole;
+    lv_obj_t *reticle;
+    lv_obj_t *phase_box;
+    lv_obj_t *phase_title;
+    lv_obj_t *phase_detail;
+    lv_obj_t *footer;
+    mole_game_snapshot_t shown;
+    bool has_shown;
+} mole_ui_cache_t;
+
+static mole_ui_cache_t s_mole_ui;
+
+static lv_obj_t *mole_group(lv_obj_t *parent, int w, int h)
+{
+    lv_obj_t *obj = lv_obj_create(parent);
+    lv_obj_set_size(obj, w, h);
+    lv_obj_set_style_pad_all(obj, 0, 0);
+    lv_obj_set_style_border_width(obj, 0, 0);
+    lv_obj_set_style_bg_opa(obj, LV_OPA_TRANSP, 0);
+    lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+    return obj;
+}
+
+static void mole_create_grid(lv_obj_t *screen)
+{
+    lv_obj_t *grid = mole_rect(screen, 21, 55, 198, 198, 0x16283A);
+    lv_obj_set_style_border_width(grid, 3, 0);
+    lv_obj_set_style_border_color(grid, lv_color_hex(KP_MUTED_LIGHT), 0);
+    mole_rect(grid, 65, 0, 2, 198, 0x526075);
+    mole_rect(grid, 131, 0, 2, 198, 0x526075);
+    mole_rect(grid, 0, 65, 198, 2, 0x526075);
+    mole_rect(grid, 0, 131, 198, 2, 0x526075);
+
+    s_mole_ui.mole = mole_group(grid, 40, 41);
+    lv_obj_t *body = mole_rect(s_mole_ui.mole, 0, 6, 40, 35, 0xA96F45);
+    lv_obj_set_style_radius(body, 18, 0);
+    lv_obj_t *ear_l = mole_rect(s_mole_ui.mole, 4, 0, 10, 10, 0xC78A58);
+    lv_obj_t *ear_r = mole_rect(s_mole_ui.mole, 26, 0, 10, 10, 0xC78A58);
+    lv_obj_set_style_radius(ear_l, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_radius(ear_r, LV_RADIUS_CIRCLE, 0);
+    mole_rect(s_mole_ui.mole, 10, 16, 4, 4, 0x15202E);
+    mole_rect(s_mole_ui.mole, 26, 16, 4, 4, 0x15202E);
+    lv_obj_t *nose = mole_rect(s_mole_ui.mole, 17, 24, 6, 5, 0xFF9AA8);
+    lv_obj_set_style_radius(nose, 2, 0);
+
+    s_mole_ui.reticle = mole_group(grid, 52, 52);
+    uint32_t rc = 0xFFD84A;
+    mole_rect(s_mole_ui.reticle, 0, 0, 16, 3, rc); mole_rect(s_mole_ui.reticle, 0, 0, 3, 16, rc);
+    mole_rect(s_mole_ui.reticle, 36, 0, 16, 3, rc); mole_rect(s_mole_ui.reticle, 49, 0, 3, 16, rc);
+    mole_rect(s_mole_ui.reticle, 0, 49, 16, 3, rc); mole_rect(s_mole_ui.reticle, 0, 36, 3, 16, rc);
+    mole_rect(s_mole_ui.reticle, 36, 49, 16, 3, rc); mole_rect(s_mole_ui.reticle, 49, 36, 3, 16, rc);
+    mole_rect(s_mole_ui.reticle, 24, 24, 4, 4, rc);
+}
+
+static void mole_set_label(lv_obj_t *label, const char *text)
+{
+    if (label && strcmp(lv_label_get_text(label), text) != 0) lv_label_set_text(label, text);
+}
+
+void ui_mole_update(const mole_game_snapshot_t *game)
+{
+    if (!game || !s_mole_ui.screen) return;
+    const mole_game_snapshot_t *old = &s_mole_ui.shown;
+    bool first = !s_mole_ui.has_shown;
+    char text[128];
+
+    if (first || old->hits != game->hits) {
+        snprintf(text, sizeof(text), "命中 %u/5", game->hits);
+        mole_set_label(s_mole_ui.hits, text);
+    }
+    if (first || old->remaining_ds != game->remaining_ds) {
+        snprintf(text, sizeof(text), "%u.%us", game->remaining_ds / 10, game->remaining_ds % 10);
+        mole_set_label(s_mole_ui.timer, text);
+    }
+    if (first || old->is_host != game->is_host)
+        mole_set_label(s_mole_ui.role, game->is_host ? "哥哥 上下瞄准" : "妹妹 左右瞄准");
+    if (first || old->ammo_loaded != game->ammo_loaded) {
+        mole_set_label(s_mole_ui.ammo, game->ammo_loaded ? "弹夹 ●" : "待换弹 ○");
+        lv_obj_set_style_text_color(s_mole_ui.ammo,
+                                   lv_color_hex(game->ammo_loaded ? KP_GREEN : KP_RED), 0);
+    }
+    if (first || old->mole_cell != game->mole_cell)
+        lv_obj_set_pos(s_mole_ui.mole, (game->mole_cell % 3) * 66 + 13,
+                       (game->mole_cell / 3) * 66 + 14);
+    if (first || old->reticle_cell != game->reticle_cell)
+        lv_obj_set_pos(s_mole_ui.reticle, (game->reticle_cell % 3) * 66 + 7,
+                       (game->reticle_cell / 3) * 66 + 7);
+
+    if (first || old->phase != game->phase || old->result != game->result ||
+        old->remaining_ds / 10 != game->remaining_ds / 10 ||
+        strcmp(old->status, game->status) != 0) {
+        const char *title = "";
+        const char *detail = "";
+        const char *footer = game->is_host ? "B1上 B2下 B3开枪" : "B1左 B2右 B3换弹";
+        uint32_t border = KP_YELLOW;
+        if (game->phase == MOLE_PHASE_IDLE) {
+            title = game->is_host ? "哥哥：上下瞄准并开枪" : "妹妹：左右瞄准并换弹";
+            snprintf(text, sizeof(text), "%s  %lu胜 %lu负", game->status,
+                     (unsigned long)game->wins, (unsigned long)game->losses);
+            detail = text;
+            footer = game->is_host ? "B3开始  长按B1主页" : "等待邀请  长按B1主页";
+        } else if (game->phase == MOLE_PHASE_COUNTDOWN) {
+            static char countdown[24];
+            snprintf(countdown, sizeof(countdown), "准备 %u", (game->remaining_ds + 9) / 10);
+            title = countdown;
+            detail = "20秒内合作击中5只";
+            footer = "准备开始  长按B1主页";
+        } else if (game->phase == MOLE_PHASE_RESULT) {
+            title = game->result == MOLE_RESULT_WIN ? "胜利！" :
+                    game->result == MOLE_RESULT_LOSE ? "挑战失败" : "本局已中止";
+            detail = game->status;
+            border = game->result == MOLE_RESULT_WIN ? KP_GREEN :
+                     game->result == MOLE_RESULT_LOSE ? KP_RED : KP_YELLOW;
+            footer = game->is_host ? "B3再来一局 长按B1主页" : "等待哥哥 长按B1主页";
+        }
+        if (game->phase == MOLE_PHASE_PLAYING) lv_obj_add_flag(s_mole_ui.phase_box, LV_OBJ_FLAG_HIDDEN);
+        else {
+            lv_obj_remove_flag(s_mole_ui.phase_box, LV_OBJ_FLAG_HIDDEN);
+            mole_set_label(s_mole_ui.phase_title, title);
+            mole_set_label(s_mole_ui.phase_detail, detail);
+            lv_obj_set_style_border_color(s_mole_ui.phase_box, lv_color_hex(border), 0);
+        }
+        mole_set_label(s_mole_ui.footer, footer);
+    }
+    s_mole_ui.shown = *game;
+    s_mole_ui.has_shown = true;
+}
+
+lv_obj_t *ui_mole_build(const app_model_snapshot_t *model, const mole_game_snapshot_t *game)
+{
+    memset(&s_mole_ui, 0, sizeof(s_mole_ui));
+    s_mole_ui.screen = ui_common_screen("双人打地鼠", model);
+    s_mole_ui.hits = ui_common_label_small(s_mole_ui.screen, "", 12, 25, 108, LV_TEXT_ALIGN_LEFT);
+    s_mole_ui.timer = ui_common_label_small(s_mole_ui.screen, "", 120, 25, 108, LV_TEXT_ALIGN_RIGHT);
+    mole_create_grid(s_mole_ui.screen);
+    s_mole_ui.role = ui_common_label_small(s_mole_ui.screen, "", 12, 261, 112, LV_TEXT_ALIGN_LEFT);
+    s_mole_ui.ammo = ui_common_label_small(s_mole_ui.screen, "", 124, 261, 104, LV_TEXT_ALIGN_RIGHT);
+    s_mole_ui.phase_box = ui_common_card(s_mole_ui.screen, 36, 105, 168, 98, false, true);
+    lv_obj_set_style_border_width(s_mole_ui.phase_box, 3, 0);
+    s_mole_ui.phase_title = ui_common_label(s_mole_ui.phase_box, "", 4, 12, 160, LV_TEXT_ALIGN_CENTER, true);
+    s_mole_ui.phase_detail = ui_common_label_small(s_mole_ui.phase_box, "", 4, 54, 160, LV_TEXT_ALIGN_CENTER);
+    ui_common_footer(s_mole_ui.screen, "", false);
+    lv_obj_t *footer_bar = lv_obj_get_child(s_mole_ui.screen, -1);
+    s_mole_ui.footer = footer_bar ? lv_obj_get_child(footer_bar, 0) : NULL;
+    ui_mole_update(game);
+    return s_mole_ui.screen;
+}
+
+void ui_mole_forget(void)
+{
+    memset(&s_mole_ui, 0, sizeof(s_mole_ui));
 }

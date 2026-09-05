@@ -12,4 +12,6 @@ esp_err_t nvs_cache_load_game_stats(uint32_t *rps_wins, uint32_t *rps_losses,
                                     uint32_t *buzzer_wins, uint32_t *buzzer_losses);
 esp_err_t nvs_cache_save_rps_stats(uint32_t wins, uint32_t losses);
 esp_err_t nvs_cache_save_buzzer_stats(uint32_t wins, uint32_t losses);
+esp_err_t nvs_cache_load_mole_stats(uint32_t *wins, uint32_t *losses);
+esp_err_t nvs_cache_save_mole_stats(uint32_t wins, uint32_t losses);
 esp_err_t nvs_cache_save_model(void);

@@ -4,6 +4,7 @@
 #include "buzzer_game_service.h"
 #include "find_service.h"
 #include "game_service.h"
+#include "mole_game_service.h"
 #include "mqtt_service.h"
 #include "nvs_cache.h"
 #include "power_service.h"
@@ -27,7 +28,7 @@
 #include <stdio.h>
 #include <string.h>
 
-typedef enum { PAGE_HOME, PAGE_TASKS, PAGE_CONFIRM, PAGE_REDEEM, PAGE_LOTTERY, PAGE_GAMES, PAGE_FIND, PAGE_RPS, PAGE_BUZZER } page_t;
+typedef enum { PAGE_HOME, PAGE_TASKS, PAGE_CONFIRM, PAGE_REDEEM, PAGE_LOTTERY, PAGE_GAMES, PAGE_FIND, PAGE_RPS, PAGE_BUZZER, PAGE_MOLE } page_t;
 static const char *TAG = "kp_ui";
 static page_t s_page = PAGE_HOME, s_confirm_return = PAGE_HOME;
 static int s_selected; static confirm_kind_t s_confirm_kind;
@@ -35,7 +36,9 @@ static char s_confirm_id[APP_ID_LEN], s_confirm_name[APP_NAME_LEN]; static int s
 static char s_message[128]; static bool s_message_error; static int64_t s_message_until;
 static int s_lottery_rotation; static bool s_lottery_animating; static int64_t s_lottery_reveal_at;
 static bool s_suppress_wake_key;
+static bool s_mole_page_created;
 static bool s_buzzer_press_consumed;
+static bool s_mole_b3_block_click;
 static int64_t s_b3_press_started;
 static bool s_b3_privacy_consumed;
 #if CONFIG_ENABLE_SCREENSHOT
@@ -54,10 +57,12 @@ static char s_find_status[64], s_find_sender[64];
 static app_model_snapshot_t s_ui_model;
 static game_snapshot_t s_game;
 static buzzer_game_snapshot_t s_buzzer;
+static mole_game_snapshot_t s_mole;
 
 static app_model_snapshot_t *model_snapshot(void) { app_model_snapshot(&s_ui_model); return &s_ui_model; }
 static game_snapshot_t *game_snapshot(void) { game_service_snapshot(&s_game); return &s_game; }
 static buzzer_game_snapshot_t *buzzer_snapshot(void) { buzzer_game_service_snapshot(&s_buzzer); return &s_buzzer; }
+static mole_game_snapshot_t *mole_snapshot(void) { mole_game_service_snapshot(&s_mole); return &s_mole; }
 static void set_message(const char *text, bool error)
 {
     ui_text_limit_lines(text, s_message, sizeof(s_message), UI_TEXT_STANDARD_MAX_CHARS);
@@ -69,6 +74,7 @@ static void render(void)
     app_model_snapshot_t *model = model_snapshot();
     game_snapshot_t *game = game_snapshot();
     buzzer_game_snapshot_t *buzzer = buzzer_snapshot();
+    mole_game_snapshot_t *mole = mole_snapshot();
 #if CONFIG_ENABLE_SCREENSHOT
     /* Preview-only snapshots never mutate ESP-NOW, MQTT, pairing, radar or RPS state. */
     if (s_debug_preview && s_page == PAGE_FIND) {
@@ -109,6 +115,13 @@ static void render(void)
         }
     }
 #endif
+    if (s_page == PAGE_MOLE && s_mole_page_created) {
+        if (bsp_lvgl_lock(100)) {
+            ui_mole_update(mole);
+            bsp_lvgl_unlock();
+        }
+        return;
+    }
     if (!bsp_lvgl_lock(1000)) return;
     lv_obj_t *screen = NULL;
     if (s_page == PAGE_HOME) screen = ui_home_build(model, s_selected);
@@ -125,7 +138,11 @@ static void render(void)
     else if (s_page == PAGE_GAMES) screen = ui_games_build(model, game, s_selected);
     else if (s_page == PAGE_FIND) screen = ui_find_build(model, game, s_find_status, s_find_waiting);
     else if (s_page == PAGE_RPS) screen = ui_rps_build(model, game);
-    else screen = ui_buzzer_build(model, buzzer);
+    else if (s_page == PAGE_BUZZER) screen = ui_buzzer_build(model, buzzer);
+    else {
+        screen = ui_mole_build(model, mole);
+        s_mole_page_created = true;
+    }
     if (s_message[0] && esp_timer_get_time() / 1000 < s_message_until) ui_common_message(screen, s_message, s_message_error);
     lv_screen_load_anim(screen, LV_SCR_LOAD_ANIM_NONE, 0, 0, true);
     bsp_lvgl_unlock();
@@ -177,6 +194,11 @@ static void go(page_t page, int selected)
         game_service_set_radar(false);
         ptt_service_set_transmitting(false);
     }
+    if (s_page == PAGE_MOLE && page != PAGE_MOLE) {
+        ui_mole_forget();
+        s_mole_page_created = false;
+    }
+    if (s_page != PAGE_MOLE && page == PAGE_MOLE) s_mole_page_created = false;
     s_page = page; s_selected = selected; ESP_LOGI(TAG, "页面=%d 选中=%d", page, selected); render();
 }
 static void key_move(int delta, int count)
@@ -194,7 +216,8 @@ static void handle_short_key(bsp_btn_t key)
 {
     app_model_snapshot_t *model = model_snapshot(); game_snapshot_t *game = game_snapshot();
     buzzer_game_snapshot_t *buzzer = buzzer_snapshot();
-    if (model->pending_type != APP_PENDING_NONE && s_page != PAGE_LOTTERY && s_page != PAGE_GAMES && s_page != PAGE_FIND && s_page != PAGE_RPS && s_page != PAGE_BUZZER) return;
+    mole_game_snapshot_t *mole = mole_snapshot();
+    if (model->pending_type != APP_PENDING_NONE && s_page != PAGE_LOTTERY && s_page != PAGE_GAMES && s_page != PAGE_FIND && s_page != PAGE_RPS && s_page != PAGE_BUZZER && s_page != PAGE_MOLE) return;
     int delta = key == BSP_BTN_UP ? -1 : 1;
     if (s_page == PAGE_HOME) {
         if (key != BSP_BTN_OK) key_move(delta, 3);
@@ -222,7 +245,7 @@ static void handle_short_key(bsp_btn_t key)
             else { set_message("无法提交\n请检查网络后重试", true); sound_service_play(SOUND_DU); render(); } }
     } else if (s_page == PAGE_LOTTERY && model->lottery_ready && !s_lottery_animating && key == BSP_BTN_OK) go(PAGE_REDEEM, 1);
     else if (s_page == PAGE_GAMES) {
-        if (key != BSP_BTN_OK) key_move(delta, 3);
+        if (key != BSP_BTN_OK) key_move(delta, 4);
         /* Find only needs one live transport; both competitive games require pairing. */
         else if (s_selected == 0) {
             if (!game->paired && !model->mqtt_online) { set_message("请长按B3先配对", false); render(); }
@@ -231,7 +254,11 @@ static void handle_short_key(bsp_btn_t key)
         } else if (!game->paired) { set_message("请长按B3先配对", false); render(); }
         else if (!game_service_heap_allows_rps()) { set_message("内存不足，对战不可用", true); render(); }
         else if (s_selected == 1) { game_service_invite_rps(); go(PAGE_RPS, 0); }
-        else { buzzer_game_service_invite(); go(PAGE_BUZZER, 0); }
+        else if (s_selected == 2) { buzzer_game_service_invite(); go(PAGE_BUZZER, 0); }
+        else {
+            if (mole->is_host) mole_game_service_begin_session();
+            go(PAGE_MOLE, 0);
+        }
     } else if (s_page == PAGE_FIND && key == BSP_BTN_OK) {
         /* Both transports fire together: MQTT when online (so HA sees it) plus an
          * unconditional ESP-NOW copy, which is the only path when we are away from home. */
@@ -264,6 +291,21 @@ static void handle_short_key(bsp_btn_t key)
             buzzer_game_service_invite();
         } else if (buzzer->state == BUZZER_STATE_IDLE && key == BSP_BTN_OK) {
             go(PAGE_GAMES, 2);
+        }
+    } else if (s_page == PAGE_MOLE) {
+        if (mole->phase == MOLE_PHASE_PLAYING) {
+            if (mole->is_host) {
+                if (key == BSP_BTN_UP) mole_game_service_host_input(MOLE_INPUT_UP);
+                else if (key == BSP_BTN_DOWN) mole_game_service_host_input(MOLE_INPUT_DOWN);
+                else mole_game_service_host_input(MOLE_INPUT_SHOOT);
+            } else {
+                if (key == BSP_BTN_UP) mole_game_service_client_input(MOLE_INPUT_LEFT);
+                else if (key == BSP_BTN_DOWN) mole_game_service_client_input(MOLE_INPUT_RIGHT);
+                else mole_game_service_client_input(MOLE_INPUT_RELOAD);
+            }
+        } else if ((mole->phase == MOLE_PHASE_IDLE || mole->phase == MOLE_PHASE_RESULT) &&
+                   mole->is_host && key == BSP_BTN_OK) {
+            mole_game_service_begin_session();
         }
     }
 }
@@ -309,9 +351,11 @@ static void process_event(const app_event_t *event)
         if (event->button == BSP_BTN_OK && event->button_event == BSP_BTN_PRESS) {
             s_b3_press_started = event->timestamp_ms;
             s_b3_privacy_consumed = false;
+            if (s_page == PAGE_MOLE) s_mole_b3_block_click = false;
         } else if (event->button == BSP_BTN_OK && event->button_event == BSP_BTN_HOLD_5S) {
             privacy_mode_toggle();
             s_b3_privacy_consumed = true;
+            if (s_page == PAGE_MOLE) s_mole_b3_block_click = true;
             set_message(privacy_mode_is_active() ? "隐私模式已开启" : "隐私模式已关闭", false);
             sound_service_play(SOUND_DING);
             render();
@@ -374,6 +418,11 @@ static void process_event(const app_event_t *event)
         /* The 1-second B3 long event is deferred until release so a 5-second hold can
          * toggle privacy without also starting pairing. */
         if (event->button_event == BSP_BTN_LONG && event->button == BSP_BTN_OK) return;
+        if (s_page == PAGE_MOLE && event->button == BSP_BTN_OK &&
+            event->button_event == BSP_BTN_CLICK && s_mole_b3_block_click) {
+            s_mole_b3_block_click = false;
+            return;
+        }
         if (b3_pair_on_release && (s_page == PAGE_HOME || s_page == PAGE_GAMES)) {
             if (game_service_heap_allows_pairing()) { game_service_start_pairing(); go(PAGE_GAMES, 0); }
             else { set_message("内存不足，无法配对", true); render(); }
@@ -384,6 +433,7 @@ static void process_event(const app_event_t *event)
             if (model->pending_type == APP_PENDING_NONE) {
                 game_service_cancel();
                 buzzer_game_service_cancel();
+                mole_game_service_cancel();
                 go(PAGE_HOME, 0);
             }
             return;
@@ -434,18 +484,21 @@ static void process_event(const app_event_t *event)
 #endif
         game_snapshot_t *game = game_snapshot();
         buzzer_game_snapshot_t *buzzer = buzzer_snapshot();
-        if (buzzer->state == BUZZER_STATE_INVITE_RECEIVED) {
+        mole_game_snapshot_t *mole = mole_snapshot();
+        if (mole->phase == MOLE_PHASE_COUNTDOWN && s_page != PAGE_MOLE) {
             power_service_wake();
             sound_service_play(SOUND_DING);
-            s_page = PAGE_BUZZER;
-            render();
+            go(PAGE_MOLE, 0);
+        } else if (buzzer->state == BUZZER_STATE_INVITE_RECEIVED) {
+            power_service_wake();
+            sound_service_play(SOUND_DING);
+            go(PAGE_BUZZER, 0);
         } else if (game->state == GAME_STATE_INVITE_RECEIVED) {
             power_service_wake();
             sound_service_play(SOUND_DING);
             /* Entering the page is not enough: the current LVGL tree still belongs
              * to the previous page until it is explicitly rebuilt. */
-            s_page = PAGE_RPS;
-            render();
+            go(PAGE_RPS, 0);
         } else if (s_page == PAGE_RPS && game->state == GAME_STATE_IDLE &&
                    (strcmp(game->status, "对方退出了游戏") == 0 || strcmp(game->status, "邀请已超时") == 0))
             go(PAGE_HOME, 0);
@@ -481,12 +534,21 @@ static void ui_task(void *arg)
             if (!s_debug_preview) {
                 game_service_tick(now);
                 buzzer_game_service_tick(now);
+                mole_game_service_tick(now);
             }
 #else
             game_service_tick(now);
             buzzer_game_service_tick(now);
+            mole_game_service_tick(now);
 #endif
             next_game_tick = now + 50;
+            if (s_page == PAGE_MOLE && s_mole_page_created) {
+                mole_game_snapshot_t *mole = mole_snapshot();
+                if (bsp_lvgl_lock(100)) {
+                    ui_mole_update(mole);
+                    bsp_lvgl_unlock();
+                }
+            }
         }
         find_service_tick(now);
         if (s_find_waiting && now >= s_find_deadline) {
