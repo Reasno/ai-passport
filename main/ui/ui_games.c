@@ -380,7 +380,15 @@ void ui_mole_update(const mole_game_snapshot_t *game)
             snprintf(text, sizeof(text), "%s  %lu胜 %lu负", game->status,
                      (unsigned long)game->wins, (unsigned long)game->losses);
             detail = text;
-            footer = game->is_host ? "B3开始  长按B1主页" : "等待邀请  长按B1主页";
+            footer = "B3开始邀请  长按B1主页";
+        } else if (game->phase == MOLE_PHASE_INVITE_SENT) {
+            title = "已发送邀请";
+            detail = "等待对方接受...";
+            footer = "等待中...  长按B1主页";
+        } else if (game->phase == MOLE_PHASE_INVITE_RECEIVED) {
+            title = "收到邀请";
+            detail = "B3接受  B2拒绝";
+            footer = "B2拒绝  B3接受  长按B1主页";
         } else if (game->phase == MOLE_PHASE_COUNTDOWN) {
             static char countdown[24];
             snprintf(countdown, sizeof(countdown), "准备 %u", (game->remaining_ds + 9) / 10);

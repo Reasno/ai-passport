@@ -60,21 +60,16 @@ static bool sequence_newer(uint16_t value, uint16_t previous)
 {
     return (int16_t)(value - previous) > 0;
 }
-static bool local_is_host(void)
-{
-#ifdef CONFIG_KIDS_ACTOR_SISTER
-    return false;
-#else
-    return true;
-#endif
-}
 static void set_status(const char *text)
 {
     strlcpy(s_game.status, text, sizeof(s_game.status));
 }
 static uint8_t remaining_ds(int64_t now)
 {
-    int64_t deadline = s_game.phase == MOLE_PHASE_COUNTDOWN ? s_countdown_deadline : s_play_deadline;
+    int64_t deadline = 0;
+    if (s_game.phase == MOLE_PHASE_INVITE_SENT || s_game.phase == MOLE_PHASE_INVITE_RECEIVED) deadline = s_invite_deadline;
+    else if (s_game.phase == MOLE_PHASE_COUNTDOWN) deadline = s_countdown_deadline;
+    else if (s_game.phase == MOLE_PHASE_PLAYING) deadline = s_play_deadline;
     if (deadline <= now) return 0;
     int64_t ds = (deadline - now + 99) / 100;
     return ds > 200 ? 200 : (uint8_t)ds;
@@ -145,13 +140,11 @@ static void enter_idle_locked(const char *status)
 {
     uint32_t wins = s_game.wins;
     uint32_t losses = s_game.losses;
-    bool host = local_is_host();
     memset(&s_game, 0, sizeof(s_game));
     s_game.wins = wins;
     s_game.losses = losses;
     s_game.paired = espnow_service_has_peer();
     s_game.peer_connected = s_game.paired;
-    s_game.is_host = host;
     s_game.reticle_cell = 4;
     s_game.ammo_loaded = true;
     set_status(status);
@@ -221,7 +214,7 @@ esp_err_t mole_game_service_start(void)
 {
     if (!s_lock) s_lock = xSemaphoreCreateMutex();
     if (!s_lock) return ESP_ERR_NO_MEM;
-    enter_idle_locked(local_is_host() ? "可发起游戏" : "等待对方邀请");
+    enter_idle_locked("准备好了");
     esp_err_t err = nvs_cache_load_mole_stats(&s_game.wins, &s_game.losses);
     if (err != ESP_OK) ESP_LOGW(TAG, "加载打地鼠战绩失败: %s", esp_err_to_name(err));
     return ESP_OK;
@@ -241,7 +234,7 @@ bool mole_game_service_owns_packet(uint8_t type)
 }
 void mole_game_service_begin_session(void)
 {
-    if (!s_lock || !local_is_host() || !espnow_service_has_peer()) return;
+    if (!s_lock || !espnow_service_has_peer()) return;
     int64_t now = monotonic_ms();
     xSemaphoreTake(s_lock, portMAX_DELAY);
     if (s_game.phase != MOLE_PHASE_IDLE && s_game.phase != MOLE_PHASE_RESULT) {
@@ -251,18 +244,36 @@ void mole_game_service_begin_session(void)
     uint16_t session;
     do { session = (uint16_t)esp_random(); } while (session == 0 || session == s_game.session);
     reset_session_locked(true, session);
+    s_game.phase = MOLE_PHASE_INVITE_SENT;
     set_status("正在邀请对方...");
     s_invite_deadline = now + MOLE_INVITE_TIMEOUT_MS;
     s_last_state_tx = 0;
-    uint32_t rules = MOLE_PROTOCOL_VERSION | (30U << 8) | (MOLE_TARGET_HITS << 16) | (30U << 24);
-    espnow_service_send_data(ESPNOW_MSG_MOLE_INVITE, s_game.session, 0, rules);
-    s_last_state_tx = now;
+    xSemaphoreGive(s_lock);
+    notify();
+}
+void mole_game_service_respond_invite(bool accept)
+{
+    if (!s_lock) return;
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    if (s_game.phase != MOLE_PHASE_INVITE_RECEIVED) {
+        xSemaphoreGive(s_lock);
+        return;
+    }
+    if (accept) {
+        s_game.phase = MOLE_PHASE_COUNTDOWN;
+        s_countdown_deadline = monotonic_ms() + MOLE_COUNTDOWN_MS;
+        set_status("已接受，等待开始");
+        espnow_service_send_data(ESPNOW_MSG_MOLE_ACCEPT, s_game.session, 0, MOLE_PROTOCOL_VERSION);
+    } else {
+        espnow_service_send_data(ESPNOW_MSG_MOLE_REJECT, s_game.session, 0, 0);
+        enter_idle_locked("已拒绝邀请");
+    }
     xSemaphoreGive(s_lock);
     notify();
 }
 void mole_game_service_host_input(mole_input_t input)
 {
-    if (!s_lock || !local_is_host()) return;
+    if (!s_lock || !s_game.is_host) return;
     int64_t now = monotonic_ms();
     bool changed;
     bool settle;
@@ -288,7 +299,7 @@ void mole_game_service_host_input(mole_input_t input)
 }
 void mole_game_service_client_input(mole_input_t input)
 {
-    if (!s_lock || local_is_host()) return;
+    if (!s_lock || s_game.is_host) return;
     int64_t now = monotonic_ms();
     xSemaphoreTake(s_lock, portMAX_DELAY);
     if (s_game.phase != MOLE_PHASE_PLAYING || now - s_last_input_ms < MOLE_INPUT_DEBOUNCE_MS) {
@@ -311,7 +322,7 @@ void mole_game_service_cancel(void)
         for (int i = 0; i < 3; ++i)
             espnow_service_send_data(ESPNOW_MSG_MOLE_CANCEL, s_game.session, 0, 1U);
     }
-    enter_idle_locked(local_is_host() ? "可发起游戏" : "等待对方邀请");
+    enter_idle_locked("已退出游戏");
     xSemaphoreGive(s_lock);
     notify();
 }
@@ -324,18 +335,17 @@ void mole_game_service_tick(int64_t now)
     xSemaphoreTake(s_lock, portMAX_DELAY);
     uint8_t previous_remaining_ds = s_game.remaining_ds;
     s_game.paired = espnow_service_has_peer();
-    if (s_game.is_host && s_game.phase == MOLE_PHASE_IDLE && s_game.session != 0 &&
-        now < s_invite_deadline && now - s_last_state_tx >= MOLE_INVITE_RETRY_MS) {
+    if (s_game.phase == MOLE_PHASE_INVITE_SENT && now - s_last_state_tx >= MOLE_INVITE_RETRY_MS) {
         uint32_t rules = MOLE_PROTOCOL_VERSION | (30U << 8) | (MOLE_TARGET_HITS << 16) | (30U << 24);
         espnow_service_send_data(ESPNOW_MSG_MOLE_INVITE, s_game.session, 0, rules);
         s_last_state_tx = now;
     }
-    if (s_game.is_host && s_game.phase == MOLE_PHASE_IDLE && s_game.session != 0 && now >= s_invite_deadline) {
-        s_game.session = 0;
-        set_status("邀请超时，请重试");
+    if ((s_game.phase == MOLE_PHASE_INVITE_SENT || s_game.phase == MOLE_PHASE_INVITE_RECEIVED) && now >= s_invite_deadline) {
+        enter_idle_locked("连接超时，请重试");
         changed = true;
     }
     if (s_game.phase != MOLE_PHASE_IDLE && s_game.phase != MOLE_PHASE_RESULT &&
+        s_game.phase != MOLE_PHASE_INVITE_SENT && s_game.phase != MOLE_PHASE_INVITE_RECEIVED &&
         s_last_peer_rx > 0 && now - s_last_peer_rx >= MOLE_PEER_TIMEOUT_MS) {
         if (s_game.is_host) finish_host_locked(MOLE_RESULT_ABORTED, now);
         else {
@@ -412,26 +422,33 @@ void mole_game_service_on_packet(const uint8_t src[6], const espnow_game_packet_
     bool changed = false;
     xSemaphoreTake(s_lock, portMAX_DELAY);
     if (p->type == ESPNOW_MSG_MOLE_INVITE) {
-        if (local_is_host() || (data & 0xffU) != MOLE_PROTOCOL_VERSION) {
+        if ((data & 0xffU) != MOLE_PROTOCOL_VERSION) {
             xSemaphoreGive(s_lock);
             return;
         }
-        if (s_game.session != p->session || s_game.phase == MOLE_PHASE_RESULT) {
+        if (s_game.phase == MOLE_PHASE_INVITE_SENT) {
+            if (strcmp(CONFIG_KIDS_DEVICE_ID, CONFIG_KIDS_PEER_DEVICE_ID) < 0) {
+                reset_session_locked(false, p->session);
+                s_game.phase = MOLE_PHASE_INVITE_RECEIVED;
+                set_status("收到打地鼠邀请");
+                s_invite_deadline = now + MOLE_INVITE_TIMEOUT_MS;
+                changed = true;
+            }
+        } else if (s_game.phase == MOLE_PHASE_IDLE || s_game.phase == MOLE_PHASE_RESULT) {
             reset_session_locked(false, p->session);
-            s_game.phase = MOLE_PHASE_COUNTDOWN;
-            s_countdown_deadline = now + MOLE_COUNTDOWN_MS;
-            set_status("已接受，等待对方开始");
+            s_game.phase = MOLE_PHASE_INVITE_RECEIVED;
+            set_status("收到打地鼠邀请");
+            s_invite_deadline = now + MOLE_INVITE_TIMEOUT_MS;
             changed = true;
         }
         s_last_peer_rx = now;
-        espnow_service_send_data(ESPNOW_MSG_MOLE_ACCEPT, s_game.session, 0, MOLE_PROTOCOL_VERSION);
     } else if (p->session != s_game.session || s_game.session == 0) {
         xSemaphoreGive(s_lock);
         return;
     } else {
         s_last_peer_rx = now;
         s_game.peer_connected = true;
-        if (p->type == ESPNOW_MSG_MOLE_ACCEPT && s_game.is_host && s_game.phase == MOLE_PHASE_IDLE) {
+        if (p->type == ESPNOW_MSG_MOLE_ACCEPT && s_game.is_host && s_game.phase == MOLE_PHASE_INVITE_SENT) {
             s_game.phase = MOLE_PHASE_COUNTDOWN;
             s_game.reticle_cell = 4;
             s_game.hits = 0;
@@ -440,6 +457,9 @@ void mole_game_service_on_packet(const uint8_t src[6], const espnow_game_packet_
             s_countdown_deadline = now + MOLE_COUNTDOWN_MS;
             set_status("准备：3");
             send_state_locked(now, true, true);
+            changed = true;
+        } else if (p->type == ESPNOW_MSG_MOLE_REJECT && s_game.is_host && s_game.phase == MOLE_PHASE_INVITE_SENT) {
+            enter_idle_locked("对方拒绝了邀请");
             changed = true;
         } else if (p->type == ESPNOW_MSG_MOLE_INPUT && s_game.is_host &&
                    s_game.phase == MOLE_PHASE_PLAYING) {

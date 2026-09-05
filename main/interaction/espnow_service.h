@@ -43,7 +43,7 @@ typedef enum {
     ESPNOW_MSG_MOLE_GAME_STATE,
     ESPNOW_MSG_MOLE_STATE_ACK,
     ESPNOW_MSG_MOLE_CANCEL,
-    ESPNOW_MSG_MOLE_RESERVED,
+    ESPNOW_MSG_MOLE_REJECT,
 } espnow_msg_type_t;
 
 typedef struct __attribute__((packed)) {
