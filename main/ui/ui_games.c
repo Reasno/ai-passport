@@ -16,7 +16,7 @@
 extern const uint8_t rps_rock_data[] asm("_binary_rock_54x72_rgb565_start");
 extern const uint8_t rps_scissors_data[] asm("_binary_scissors_54x72_rgb565_start");
 extern const uint8_t rps_paper_data[] asm("_binary_paper_54x72_rgb565_start");
-extern const uint8_t mole_logo_data[] asm("_binary_mole_54x72_rgb565_start");
+extern const uint8_t mole_logo_data[] asm("_binary_mole_54x72_rgb565a8_start");
 
 #define RPS_IMAGE(name, data_ptr) \
     static const lv_image_dsc_t name = { \
@@ -33,7 +33,17 @@ extern const uint8_t mole_logo_data[] asm("_binary_mole_54x72_rgb565_start");
 RPS_IMAGE(s_rps_rock, rps_rock_data);
 RPS_IMAGE(s_rps_scissors, rps_scissors_data);
 RPS_IMAGE(s_rps_paper, rps_paper_data);
-RPS_IMAGE(s_mole_logo, mole_logo_data);
+
+static const lv_image_dsc_t s_mole_logo = {
+    .header.magic = LV_IMAGE_HEADER_MAGIC,
+    .header.cf = LV_COLOR_FORMAT_RGB565A8,
+    .header.flags = 0,
+    .header.w = RPS_ART_WIDTH,
+    .header.h = RPS_ART_HEIGHT,
+    .header.stride = RPS_ART_WIDTH * 2,
+    .data_size = RPS_ART_WIDTH * RPS_ART_HEIGHT * 3,
+    .data = mole_logo_data,
+};
 
 static void rps_choice_card(lv_obj_t *screen, int x, const lv_image_dsc_t *image_source,
                             const char *label, bool selected)
