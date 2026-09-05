@@ -81,7 +81,12 @@ static void game_card(lv_obj_t *screen, int y, bool selected, bool enabled, ui_p
                     ? ui_buzzer_icon_create(card, 0, 0, enabled, 3)
                     : ui_pixel_icon_create(card, icon, 0, 0, enabled ? KP_THEME : KP_MUTED, 3);
     }
-    if (image) lv_obj_align(image, LV_ALIGN_LEFT_MID, 14, 0);
+    if (image) {
+        /* Scaled artwork keeps its original object bounds in LVGL. Offset the
+         * 54 px mole canvas so its visual centre matches the 40 px menu icons. */
+        const int icon_x = art ? 14 - (RPS_ART_WIDTH - 40) / 2 : 14;
+        lv_obj_align(image, LV_ALIGN_LEFT_MID, icon_x, 0);
+    }
     ui_common_label(card, title, 56, 2, 148, LV_TEXT_ALIGN_LEFT, false);
     lv_obj_t *d = ui_common_label_small(card, detail, 56, 28, 148, LV_TEXT_ALIGN_LEFT);
     lv_obj_set_style_text_color(d, lv_color_hex(enabled ? KP_MUTED_LIGHT : KP_MUTED), 0);
@@ -396,12 +401,12 @@ void ui_mole_update(const mole_game_snapshot_t *game)
             detail = "30秒内合作击中5只";
             footer = "准备开始  长按B1主页";
         } else if (game->phase == MOLE_PHASE_RESULT) {
-            title = game->result == MOLE_RESULT_WIN ? "胜利！" :
-                    game->result == MOLE_RESULT_LOSE ? "挑战失败" : "本局已中止";
+            title = game->result == MOLE_RESULT_WIN ? "胜利" :
+                    game->result == MOLE_RESULT_LOSE ? "时间到" : "本局已中止";
             detail = game->status;
             border = game->result == MOLE_RESULT_WIN ? KP_GREEN :
                      game->result == MOLE_RESULT_LOSE ? KP_RED : KP_YELLOW;
-            footer = game->is_host ? "B3再来一局 长按B1主页" : "等待对方 长按B1主页";
+            footer = "B3 再试一次  长按B1主页";
         }
         if (game->phase == MOLE_PHASE_PLAYING) lv_obj_add_flag(s_mole_ui.phase_box, LV_OBJ_FLAG_HIDDEN);
         else {
