@@ -7,9 +7,11 @@
 
 typedef enum {
     MOLE_PHASE_IDLE = 0,
-    MOLE_PHASE_COUNTDOWN = 1,
-    MOLE_PHASE_PLAYING = 2,
-    MOLE_PHASE_RESULT = 3,
+    MOLE_PHASE_INVITE_SENT = 1,
+    MOLE_PHASE_INVITE_RECEIVED = 2,
+    MOLE_PHASE_COUNTDOWN = 3,
+    MOLE_PHASE_PLAYING = 4,
+    MOLE_PHASE_RESULT = 5,
 } mole_phase_t;
 
 typedef enum {
@@ -50,6 +52,7 @@ esp_err_t mole_game_service_start(void);
 void mole_game_service_tick(int64_t now_ms);
 void mole_game_service_snapshot(mole_game_snapshot_t *out);
 void mole_game_service_begin_session(void);
+void mole_game_service_respond_invite(bool accept);
 void mole_game_service_host_input(mole_input_t input);
 void mole_game_service_client_input(mole_input_t input);
 void mole_game_service_cancel(void);

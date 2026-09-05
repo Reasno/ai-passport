@@ -256,7 +256,7 @@ static void handle_short_key(bsp_btn_t key)
         else if (s_selected == 1) { game_service_invite_rps(); go(PAGE_RPS, 0); }
         else if (s_selected == 2) { buzzer_game_service_invite(); go(PAGE_BUZZER, 0); }
         else {
-            if (mole->is_host) mole_game_service_begin_session();
+            mole_game_service_begin_session();
             go(PAGE_MOLE, 0);
         }
     } else if (s_page == PAGE_FIND && key == BSP_BTN_OK) {
@@ -293,7 +293,10 @@ static void handle_short_key(bsp_btn_t key)
             go(PAGE_GAMES, 2);
         }
     } else if (s_page == PAGE_MOLE) {
-        if (mole->phase == MOLE_PHASE_PLAYING) {
+        if (mole->phase == MOLE_PHASE_INVITE_RECEIVED) {
+            if (key == BSP_BTN_OK) mole_game_service_respond_invite(true);
+            else if (key == BSP_BTN_DOWN) { mole_game_service_respond_invite(false); go(PAGE_GAMES, 3); }
+        } else if (mole->phase == MOLE_PHASE_PLAYING) {
             if (mole->is_host) {
                 if (key == BSP_BTN_UP) mole_game_service_host_input(MOLE_INPUT_UP);
                 else if (key == BSP_BTN_DOWN) mole_game_service_host_input(MOLE_INPUT_DOWN);
@@ -485,7 +488,11 @@ static void process_event(const app_event_t *event)
         game_snapshot_t *game = game_snapshot();
         buzzer_game_snapshot_t *buzzer = buzzer_snapshot();
         mole_game_snapshot_t *mole = mole_snapshot();
-        if (mole->phase == MOLE_PHASE_COUNTDOWN && s_page != PAGE_MOLE) {
+        if (mole->phase == MOLE_PHASE_INVITE_RECEIVED && s_page != PAGE_MOLE) {
+            power_service_wake();
+            sound_service_play(SOUND_DING);
+            go(PAGE_MOLE, 0);
+        } else if (mole->phase == MOLE_PHASE_COUNTDOWN && s_page != PAGE_MOLE) {
             power_service_wake();
             sound_service_play(SOUND_DING);
             go(PAGE_MOLE, 0);
