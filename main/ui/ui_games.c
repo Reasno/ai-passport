@@ -381,7 +381,7 @@ void ui_mole_update(const mole_game_snapshot_t *game)
     if (first || old->hits != game->hits) {
         snprintf(text, sizeof(text), "命中 %u/5", game->hits);
         mole_set_label(s_mole_ui.hits, text);
-        if (!first && game->is_host && game->hits > old->hits)
+        if (!first && game->hits > old->hits)
             mole_show_hit_fx(old->mole_cell);
     }
     if (first || old->remaining_ds != game->remaining_ds) {

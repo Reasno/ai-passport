@@ -41,7 +41,7 @@ typedef struct {
     uint8_t mole_cell;
     uint8_t mole_generation;
     uint8_t hits;
-    uint8_t remaining_ds;
+    uint16_t remaining_ds;
     uint16_t session;
     uint32_t wins;
     uint32_t losses;
