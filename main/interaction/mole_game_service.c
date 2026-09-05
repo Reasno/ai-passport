@@ -66,6 +66,18 @@ static void set_status(const char *text)
 {
     strlcpy(s_game.status, text, sizeof(s_game.status));
 }
+
+static void set_win_status_from_nvs(void)
+{
+    uint32_t wins = 0;
+    uint32_t losses = 0;
+    esp_err_t err = nvs_cache_load_mole_stats(&wins, &losses);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "读取打地鼠历史胜场失败: %s", esp_err_to_name(err));
+        wins = s_game.wins;
+    }
+    snprintf(s_game.status, sizeof(s_game.status), "合作胜利 × %lu", (unsigned long)wins);
+}
 static uint16_t remaining_ds(int64_t now)
 {
     int64_t deadline = 0;
@@ -176,15 +188,23 @@ static void finish_host_locked(mole_result_t result, int64_t now)
     s_game.phase = MOLE_PHASE_RESULT;
     s_game.result = result;
     s_game.remaining_ds = 0;
-    if (result == MOLE_RESULT_WIN) set_status("合作成功！");
+    if (!s_settled && (result == MOLE_RESULT_WIN || result == MOLE_RESULT_LOSE)) {
+        if (result == MOLE_RESULT_WIN) {
+            ++s_game.wins;
+            esp_err_t err = nvs_cache_save_mole_stats(s_game.wins, s_game.losses);
+            if (err != ESP_OK) {
+                ESP_LOGW(TAG, "保存打地鼠战绩失败: %s", esp_err_to_name(err));
+                s_settlement_pending = true;
+            }
+        } else {
+            ++s_game.losses;
+            s_settlement_pending = true;
+        }
+        s_settled = true;
+    }
+    if (result == MOLE_RESULT_WIN) set_win_status_from_nvs();
     else if (result == MOLE_RESULT_LOSE) set_status("时间到，再试一次");
     else set_status("连接中断，本局取消");
-    if (!s_settled && (result == MOLE_RESULT_WIN || result == MOLE_RESULT_LOSE)) {
-        if (result == MOLE_RESULT_WIN) ++s_game.wins;
-        else ++s_game.losses;
-        s_settled = true;
-        s_settlement_pending = true;
-    }
     s_result_retry_until = now + MOLE_RESULT_RETRY_MS;
     send_state_locked(now, true, true);
 }
@@ -537,7 +557,7 @@ void mole_game_service_on_packet(const uint8_t src[6], const espnow_game_packet_
                     s_play_deadline = now + (int64_t)s_game.remaining_ds * 100;
                 if (s_game.phase == MOLE_PHASE_COUNTDOWN) set_status("准备倒计时");
                 else if (s_game.phase == MOLE_PHASE_PLAYING) set_status("合作打中 3 只地鼠");
-                else if (s_game.result == MOLE_RESULT_WIN) set_status("合作成功！");
+                else if (s_game.result == MOLE_RESULT_WIN) set_win_status_from_nvs();
                 else if (s_game.result == MOLE_RESULT_LOSE) set_status("时间到，再试一次");
                 else if (s_game.result == MOLE_RESULT_ABORTED) set_status("连接中断，本局取消");
                 changed = old.phase != s_game.phase || old.result != s_game.result ||
