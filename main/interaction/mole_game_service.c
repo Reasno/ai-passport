@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MOLE_PROTOCOL_VERSION 1U
+#define MOLE_PROTOCOL_VERSION 2U
 #define MOLE_DURATION_MS 30000
 #define MOLE_PERIOD_MS 3000
 #define MOLE_COUNTDOWN_MS 3000
@@ -74,9 +74,27 @@ static uint8_t remaining_ds(int64_t now)
     int64_t ds = (deadline - now + 99) / 100;
     return ds > 200 ? 200 : (uint8_t)ds;
 }
+static uint8_t phase_to_wire(mole_phase_t phase)
+{
+    switch (phase) {
+    case MOLE_PHASE_COUNTDOWN: return 1U;
+    case MOLE_PHASE_PLAYING: return 2U;
+    case MOLE_PHASE_RESULT: return 3U;
+    default: return 0U;
+    }
+}
+static mole_phase_t phase_from_wire(uint8_t phase)
+{
+    switch (phase & 0x03U) {
+    case 1U: return MOLE_PHASE_COUNTDOWN;
+    case 2U: return MOLE_PHASE_PLAYING;
+    case 3U: return MOLE_PHASE_RESULT;
+    default: return MOLE_PHASE_IDLE;
+    }
+}
 static uint32_t pack_state(int64_t now)
 {
-    uint32_t data = (uint32_t)s_game.phase;
+    uint32_t data = phase_to_wire(s_game.phase);
     data |= (uint32_t)(s_game.reticle_cell & 0x0f) << 2;
     data |= (uint32_t)(s_game.mole_cell & 0x0f) << 6;
     data |= (uint32_t)(s_game.ammo_loaded ? 1U : 0U) << 10;
@@ -483,7 +501,7 @@ void mole_game_service_on_packet(const uint8_t src[6], const espnow_game_packet_
                 mole_game_snapshot_t old = s_game;
                 s_has_state_sequence = true;
                 s_last_state_rx_sequence = p->sequence;
-                s_game.phase = (mole_phase_t)(data & 0x03U);
+                s_game.phase = phase_from_wire((uint8_t)data);
                 s_game.reticle_cell = (uint8_t)((data >> 2) & 0x0fU);
                 s_game.mole_cell = (uint8_t)((data >> 6) & 0x0fU);
                 s_game.ammo_loaded = ((data >> 10) & 1U) != 0;
