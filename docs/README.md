@@ -95,7 +95,7 @@ Example branches may change the same menu, configuration, or driver in incompati
 
 ## ESP-NOW paired games
 
-Pair the two devices from Home or Games by holding B3 for one to five seconds. The Whac-A-Mole entry uses the existing paired peer and never starts pairing from inside its page. The brother device starts the round, moves the shared reticle vertically with B1/B2, and shoots with B3. The sister device moves it horizontally with B1/B2 and reloads the shared one-round magazine with B3. Hit five moles within 20 seconds to win; each mole moves after three seconds even if it was not hit. Holding B3 for five seconds still toggles privacy mode on every page.
+Pair the two devices from Home or Games by holding B3 for one to five seconds. The Whac-A-Mole entry uses the existing paired peer and never starts pairing from inside its page. The brother device starts the round, moves the shared reticle vertically with B1/B2, and shoots with B3. The sister device moves it horizontally with B1/B2 and reloads the shared one-round magazine with B3. Hit three moles within 20 seconds to win; each mole moves after three seconds even if it was not hit. Holding B3 for five seconds still toggles privacy mode on every page.
 
 ## USB screenshot debugging
 

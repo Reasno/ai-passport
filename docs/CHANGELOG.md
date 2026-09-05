@@ -6,6 +6,8 @@
 
 ## Unreleased
 
+- Reduced the cooperative Whac-A-Mole victory target from five hits to three.
+
 - Added the cooperative two-player Whac-A-Mole game. The brother device is the authoritative Host for vertical aiming and shooting, while the sister device controls horizontal aiming and reloads the shared one-round magazine. Both devices render the same 3×3 board from 16-byte ESP-NOW state snapshots with input de-duplication, sequence filtering, heartbeat recovery, acknowledged phase transitions, peer-timeout aborts, and Host-only persistent win/loss records.
 
 - Capped codec output volume at 85% to reduce speaker clipping at maximum volume.
