@@ -53,6 +53,7 @@
 - Updated software-design and project README references for the new documentation structure.
 - Added the documentation catalog and task-triggered routing based on the earlier repository model.
 - Added bilingual contribution, code-of-conduct, security, and support documents tailored to this ESP-IDF and fork workflow.
+- Regenerated the bundled UI fonts to cover every current Whac-A-Mole label, including the multiplication sign in the cooperative victory count.
 - Changed the cooperative Whac-A-Mole victory result to show the device's latest persisted lifetime win count.
 - Reduced the cooperative Whac-A-Mole victory target from five hits to three.
 - Added the cooperative two-player Whac-A-Mole game. The brother device is the authoritative Host for vertical aiming and shooting, while the sister device controls horizontal aiming and reloads the shared one-round magazine. Both devices render the same 3×3 board from 16-byte ESP-NOW state snapshots with input de-duplication, sequence filtering, heartbeat recovery, acknowledged phase transitions, peer-timeout aborts, and Host-only persistent win/loss records.
