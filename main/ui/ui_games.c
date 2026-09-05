@@ -83,7 +83,7 @@ lv_obj_t *ui_games_build(const app_model_snapshot_t *model, const game_snapshot_
     game_card(screen, 147, selected == 2, game_service_heap_allows_rps() && game->paired,
               UI_PIXEL_ICON_BUZZER, "抢答器", game->paired ? "B3 抢答 纯娱乐" : "请先完成配对");
     game_card(screen, 201, selected == 3, game_service_heap_allows_rps() && game->paired,
-              UI_PIXEL_ICON_RPS, "双人打地鼠", game->paired ? "哥哥瞄准 妹妹换弹" : "请先完成配对");
+              UI_PIXEL_ICON_RPS, "打地鼠", game->paired ? "哥哥瞄准 妹妹换弹" : "请先完成配对");
     char heap[48]; snprintf(heap, sizeof(heap), "可用内存 %lu KB", (unsigned long)(esp_get_free_heap_size() / 1024));
     lv_obj_t *h = ui_common_label_small(screen, heap, 12, 258, 216, LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_text_color(h, lv_color_hex(KP_MUTED), 0);
@@ -391,7 +391,7 @@ void ui_mole_update(const mole_game_snapshot_t *game)
 lv_obj_t *ui_mole_build(const app_model_snapshot_t *model, const mole_game_snapshot_t *game)
 {
     memset(&s_mole_ui, 0, sizeof(s_mole_ui));
-    s_mole_ui.screen = ui_common_screen("双人打地鼠", model);
+    s_mole_ui.screen = ui_common_screen("打地鼠", model);
     s_mole_ui.hits = ui_common_label_small(s_mole_ui.screen, "", 12, 25, 108, LV_TEXT_ALIGN_LEFT);
     s_mole_ui.timer = ui_common_label_small(s_mole_ui.screen, "", 120, 25, 108, LV_TEXT_ALIGN_RIGHT);
     mole_create_grid(s_mole_ui.screen);

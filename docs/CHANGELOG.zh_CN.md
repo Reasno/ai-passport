@@ -10,30 +10,11 @@
 
 ## Unreleased
 
-<<<<<<< HEAD
 - 加入厂家为优特利 520mAh 电芯生成的 80 字节 CW2017 profile，并实现内容与更新标志检查、写入后校验、规定的重启时序以及有上限的 SOC 就绪等待。
 - 扩充环境引导文档：新增乐鑫 Git 服务镜像（`git.espressif.com.cn`）作为中国大陆首选线路，覆盖 ESP-IDF v5.5.3 及其子模块；补充子模块长等待/超时处理、原地修复，以及 `esp32-wifi-lib` 等大仓的按钉死 commit 浅取；提示按仓库残留的 Jihulab `insteadOf` 旧配置；并把官方离线 release 压缩包加入兜底方案（经验来自 `esp-mosaico/esp-mosaico-vibe`）。
 - 按功能域整理文档并采用双入口：根目录 `AGENTS.md` 变为薄路由（只保留硬约束与任务路由），详细的 AI 开发工作流下沉到 `docs/development/ai-guide.md`，`agent-guide.md` 并入其中。为 `docs/development/` 增加二级分区（`engineering/`、`ci/`、`release/`），把 `plays/` 应用档案与 `experiences/` 移入带专属 README 的 `docs/reference/` 参考区；删除 `docs/software-design/`（空脚手架）；把 `assets/{fonts,images,music}/README` 三个叶子 README 并入 `assets/` README；把 `project-completion` 的六个子文档压平为单文件；并把每个目录统一为单一 README，消除所有 `INDEX` 文件与一处重复经验索引。所有交叉引用与文献链接已更新；未丢弃任何内容。
 - 删除位于 `0x700000` 的旧 app/test 分区，以及相关的 bootloader、校验和
   文档要求；固定的 `cardid` 保护分区及其 CI 校验保持不变。
-=======
-- 新增双机协作“双人打地鼠”：哥哥设备作为权威 Host，负责上下移动准星和开枪；妹妹设备负责左右移动准星，并为共享的单发弹夹换弹。双端根据 16 字节 ESP-NOW 全量状态显示同一 3×3 画面，并实现输入去重、状态序列过滤、心跳恢复、关键阶段 ACK/重发、对端超时中止，以及仅 Host 持久化的胜负战绩。
-
-- 将 codec 输出音量上限设为 85%，减少最大音量下的扬声器破音。
-
-- 儿童积分固件在 60 秒无操作后进入 Light Sleep；GPIO0 三键或 ESP-NOW 找人/游戏邀请均可唤醒，远程邀请会恢复屏幕并播放提示音。
-
-- 抢答器游戏新增 F1 风格声音倒计时：三盏红灯逐盏亮起时分别发出提示音，全部熄灭进入 GO 时播放更短促、更高频的开始音。
-
-- 将对讲可用的空闲堆内存阈值从 80 KB 下调到 70 KB，使内存较紧张时仍可发起对讲。
-
-- 新增两台 AI Passport 的“抢答器”游戏：复用 ESP-NOW 配对/邀请模式，通过 NTP-like 时钟偏移采样、Host 绝对时间线、按键按下时间戳和带 ACK 的 Host 裁决，实现三灯倒计时、Host 随机 GO 延迟、抢跑判负、平局与超时处理，且不联动积分；串口截图新增无 ESP-NOW 副作用的 `BUZZER`、`BUZZER_ARMED`、`BUZZER_GO` 和 `BUZZER_RESULT` 调试预览。
-
-- 找兄弟姐妹入口页 footer 显示长按 B1 主页、长按 B2 对讲和 B3 响铃，同时保留发起方等待页的 B3 取消提示；石头剪刀布结果页明确显示长按 B1 主页和 B3 再来一局，并改为长按 B1 才返回主页。
-- 将小程序 BLE 安装兼容提升为二创模板强制契约：固定保护 `cardid`/Recovery 分区，
-  保留上键持续 5 秒进入 Recovery 的 bootloader hook，并在 CI 强制校验合并镜像结构、
-  分区表 MD5/范围、3 MB 应用上限和保护分区数据不入包。
->>>>>>> 7fa2f15 (feat(games): add cooperative whac-a-mole)
 - 规定多应用发布的 Release 标题约定：tag 按 `v<版本>-<应用名>`（如 `v0.1.0-voice-keychain`）命名，让 Release 标题同时带版本与应用名；发布成功后核对标题，保证一眼扫 Release 列表就能区分是哪个应用。
 - 新增发布后收尾流程：`issue-suggestions` skill 用于把用户反馈作为 issue 提交到上游项目；`experience-pr` skill 用于把可复用的开发经验作为文档 PR 提交；新增 `docs/experiences/` 目录保存单条经验文件；并配套 `project-completion`、`file-issues` 与经验索引文档。
 - 精简仓库根目录：将 GitHub 可识别的社区治理文档迁入 `.github/`，将变更记录迁入 `docs/`，同步全部引用，并在仓库检查中加入根目录文档白名单。
@@ -69,6 +50,7 @@
 - 同步更新索引：`docs/software-design/README.md`、`README.en_US.md` / `README.zh_CN.md` 的 `docs/` 目录说明。
 - 参考 cindy 仓库文档组织完善索引：新增 `docs/README.md` 根总索引；AGENTS.md 规则索引按触发场景改写（附触发条件）；`docs/contribution/` 与 `docs/development/` 的 README 补充收录标准。
 - 引入社区治理文档（参照 cindy 改写，放仓库根目录）：新增 `CONTRIBUTING.md` / `.zh_CN.md`（贡献指南，针对 ESP-IDF/AI agent/fork 场景改写）、`CODE_OF_CONDUCT.md` / `.zh_CN.md`（贡献者公约）、`SECURITY.md` / `.zh_CN.md`（安全报告流程）、`SUPPORT.md` / `.zh_CN.md`（支持渠道）；AGENTS.md 与 docs/README.md 同步引用。
+- 新增双机协作“打地鼠”：哥哥设备作为权威 Host，负责上下移动准星和开枪；妹妹设备负责左右移动准星，并为共享的单发弹夹换弹。双端根据 16 字节 ESP-NOW 全量状态显示同一 3×3 画面，并实现输入去重、状态序列过滤、心跳恢复、关键阶段 ACK/重发、对端超时中止，以及仅 Host 持久化的胜负战绩。
 - 将 codec 输出音量上限设为 85%，减少最大音量下的扬声器破音。
 - 儿童积分固件在 60 秒无操作后进入 Light Sleep；GPIO0 三键或 ESP-NOW 找人/游戏邀请均可唤醒，远程邀请会恢复屏幕并播放提示音。
 - 抢答器游戏新增 F1 风格声音倒计时：三盏红灯逐盏亮起时分别发出提示音，全部熄灭进入 GO 时播放更短促、更高频的开始音。
