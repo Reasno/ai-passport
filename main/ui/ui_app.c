@@ -488,7 +488,7 @@ static void process_event(const app_event_t *event)
         game_snapshot_t *game = game_snapshot();
         buzzer_game_snapshot_t *buzzer = buzzer_snapshot();
         mole_game_snapshot_t *mole = mole_snapshot();
-        if (mole->phase == MOLE_PHASE_INVITE_RECEIVED && s_page != PAGE_MOLE) {
+        if (mole->phase == MOLE_PHASE_INVITE_RECEIVED) {
             power_service_wake();
             sound_service_play(SOUND_DING);
             go(PAGE_MOLE, 0);
