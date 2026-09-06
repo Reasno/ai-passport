@@ -557,8 +557,18 @@ void mole_game_service_on_packet(const uint8_t src[6], const espnow_game_packet_
                     s_play_deadline = now + (int64_t)s_game.remaining_ds * 100;
                 if (s_game.phase == MOLE_PHASE_COUNTDOWN) set_status("准备倒计时");
                 else if (s_game.phase == MOLE_PHASE_PLAYING) set_status("合作打中 3 只地鼠");
-                else if (s_game.result == MOLE_RESULT_WIN) set_win_status_from_nvs();
-                else if (s_game.result == MOLE_RESULT_LOSE) set_status("时间到，再试一次");
+                else if (s_game.result == MOLE_RESULT_WIN) {
+                    if (old.phase != MOLE_PHASE_RESULT && !s_settled) {
+                        ++s_game.wins;
+                        esp_err_t err = nvs_cache_save_mole_stats(s_game.wins, s_game.losses);
+                        if (err != ESP_OK) {
+                            ESP_LOGW(TAG, "保存打地鼠战绩失败: %s", esp_err_to_name(err));
+                            s_settlement_pending = true;
+                        }
+                        s_settled = true;
+                    }
+                    set_win_status_from_nvs();
+                } else if (s_game.result == MOLE_RESULT_LOSE) set_status("时间到，再试一次");
                 else if (s_game.result == MOLE_RESULT_ABORTED) set_status("连接中断，本局取消");
                 changed = old.phase != s_game.phase || old.result != s_game.result ||
                           old.reticle_cell != s_game.reticle_cell || old.mole_cell != s_game.mole_cell ||

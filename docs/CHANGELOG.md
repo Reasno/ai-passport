@@ -54,9 +54,9 @@
 - Added the documentation catalog and task-triggered routing based on the earlier repository model.
 - Added bilingual contribution, code-of-conduct, security, and support documents tailored to this ESP-IDF and fork workflow.
 - Regenerated the bundled UI fonts to cover every current Whac-A-Mole label, including the multiplication sign in the cooperative victory count.
-- Changed the cooperative Whac-A-Mole victory result to show the device's latest persisted lifetime win count.
+- Fixed cooperative Whac-A-Mole wins so both Host and Client increment their own persisted lifetime win count and display it on the result page.
 - Reduced the cooperative Whac-A-Mole victory target from five hits to three.
-- Added the cooperative two-player Whac-A-Mole game. The brother device is the authoritative Host for vertical aiming and shooting, while the sister device controls horizontal aiming and reloads the shared one-round magazine. Both devices render the same 3×3 board from 16-byte ESP-NOW state snapshots with input de-duplication, sequence filtering, heartbeat recovery, acknowledged phase transitions, peer-timeout aborts, and Host-only persistent win/loss records.
+- Added the cooperative two-player Whac-A-Mole game. The brother device is the authoritative Host for vertical aiming and shooting, while the sister device controls horizontal aiming and reloads the shared one-round magazine. Both devices render the same 3×3 board from 16-byte ESP-NOW state snapshots with input de-duplication, sequence filtering, heartbeat recovery, acknowledged phase transitions, peer-timeout aborts, and per-device persistent win records.
 - Capped codec output volume at 85% to reduce speaker clipping at maximum volume.
 - Added automatic Light Sleep after 60 seconds of inactivity. GPIO0 keys and ESP-NOW find/game invitations wake the device; remote invitations restore the display and play an alert.
 - Added an F1-style audible countdown to the buzzer game: each red light now beeps as it illuminates, followed by a shorter, higher-pitched GO beep when all lights go out.
