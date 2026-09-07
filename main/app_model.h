@@ -17,6 +17,7 @@ typedef struct {
     int32_t points;
     bool completed_today;
     bool self_complete;
+    bool evidence_required;
 } app_task_t;
 
 typedef struct {
@@ -26,7 +27,7 @@ typedef struct {
     bool enabled;
 } app_reward_t;
 
-typedef enum { APP_PENDING_NONE, APP_PENDING_TASK, APP_PENDING_REDEEM, APP_PENDING_LOTTERY } app_pending_type_t;
+typedef enum { APP_PENDING_NONE, APP_PENDING_TASK, APP_PENDING_EVIDENCE, APP_PENDING_REDEEM, APP_PENDING_LOTTERY } app_pending_type_t;
 
 typedef struct {
     int32_t balance;

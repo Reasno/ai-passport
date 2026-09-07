@@ -5,6 +5,7 @@
 #include "buzzer_game_service.h"
 #include "espnow_service.h"
 #include "find_service.h"
+#include "evidence_service.h"
 #include "game_service.h"
 #include "mole_game_service.h"
 #include "ptt_service.h"
@@ -52,8 +53,10 @@ void app_main(void)
             ESP_ERROR_CHECK_WITHOUT_ABORT(game_service_start());
             ESP_ERROR_CHECK_WITHOUT_ABORT(buzzer_game_service_start());
             ESP_ERROR_CHECK_WITHOUT_ABORT(mole_game_service_start());
-            if (audio == ESP_OK) ESP_ERROR_CHECK_WITHOUT_ABORT(ptt_service_start());
-            else ESP_LOGW(TAG, "PTT灰化: 音频RX不可用（codec初始化失败）");
+            if (audio == ESP_OK) {
+                ESP_ERROR_CHECK_WITHOUT_ABORT(ptt_service_start());
+                ESP_ERROR_CHECK_WITHOUT_ABORT(evidence_service_start());
+            } else ESP_LOGW(TAG, "PTT灰化: 音频RX不可用（codec初始化失败）");
         } else ESP_LOGW(TAG, "ESP-NOW互动不可用: %s", esp_err_to_name(now));
     }
     xTaskCreatePinnedToCore(heap_log_task, "kp_heap", 2048, NULL, 1, NULL, 0);

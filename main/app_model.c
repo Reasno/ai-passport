@@ -92,6 +92,8 @@ esp_err_t app_model_parse_tasks(const char *json, size_t len, size_t *parsed_cou
         if (!done) done = cJSON_GetObjectItemCaseSensitive(entry, "done");
         temp[count].completed_today = cJSON_IsTrue(done);
         temp[count].self_complete = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(entry, "self_complete"));
+        cJSON *evidence_required = cJSON_GetObjectItemCaseSensitive(entry, "evidence_required");
+        temp[count].evidence_required = evidence_required ? cJSON_IsTrue(evidence_required) : !temp[count].self_complete;
         count++;
     }
     app_model_replace_tasks(temp, count);

@@ -3,6 +3,7 @@
 #include "app_model.h"
 #include "buzzer_game_service.h"
 #include "find_service.h"
+#include "evidence_service.h"
 #include "game_service.h"
 #include "mole_game_service.h"
 #include "mqtt_service.h"
@@ -13,6 +14,7 @@
 #include "sound_service.h"
 #include "ui_common.h"
 #include "ui_confirm.h"
+#include "ui_evidence.h"
 #include "ui_games.h"
 #include "ui_home.h"
 #include "ui_lottery.h"
@@ -28,11 +30,12 @@
 #include <stdio.h>
 #include <string.h>
 
-typedef enum { PAGE_HOME, PAGE_TASKS, PAGE_CONFIRM, PAGE_REDEEM, PAGE_LOTTERY, PAGE_GAMES, PAGE_FIND, PAGE_RPS, PAGE_BUZZER, PAGE_MOLE } page_t;
+typedef enum { PAGE_HOME, PAGE_TASKS, PAGE_CONFIRM, PAGE_EVIDENCE, PAGE_REDEEM, PAGE_LOTTERY, PAGE_GAMES, PAGE_FIND, PAGE_RPS, PAGE_BUZZER, PAGE_MOLE } page_t;
 static const char *TAG = "kp_ui";
 static page_t s_page = PAGE_HOME, s_confirm_return = PAGE_HOME;
 static int s_selected; static confirm_kind_t s_confirm_kind;
 static char s_confirm_id[APP_ID_LEN], s_confirm_name[APP_NAME_LEN]; static int s_confirm_points;
+static char s_evidence_task_id[APP_ID_LEN], s_evidence_task_name[APP_NAME_LEN];
 static char s_message[128]; static bool s_message_error; static int64_t s_message_until;
 static int s_lottery_rotation; static bool s_lottery_animating; static int64_t s_lottery_reveal_at;
 static bool s_suppress_wake_key;
@@ -58,11 +61,13 @@ static app_model_snapshot_t s_ui_model;
 static game_snapshot_t s_game;
 static buzzer_game_snapshot_t s_buzzer;
 static mole_game_snapshot_t s_mole;
+static evidence_service_snapshot_t s_evidence;
 
 static app_model_snapshot_t *model_snapshot(void) { app_model_snapshot(&s_ui_model); return &s_ui_model; }
 static game_snapshot_t *game_snapshot(void) { game_service_snapshot(&s_game); return &s_game; }
 static buzzer_game_snapshot_t *buzzer_snapshot(void) { buzzer_game_service_snapshot(&s_buzzer); return &s_buzzer; }
 static mole_game_snapshot_t *mole_snapshot(void) { mole_game_service_snapshot(&s_mole); return &s_mole; }
+static evidence_service_snapshot_t *evidence_snapshot(void) { evidence_service_snapshot(&s_evidence); return &s_evidence; }
 static void set_message(const char *text, bool error)
 {
     ui_text_limit_lines(text, s_message, sizeof(s_message), UI_TEXT_STANDARD_MAX_CHARS);
@@ -75,6 +80,8 @@ static void render(void)
     game_snapshot_t *game = game_snapshot();
     buzzer_game_snapshot_t *buzzer = buzzer_snapshot();
     mole_game_snapshot_t *mole = mole_snapshot();
+    evidence_service_snapshot_t *evidence = evidence_snapshot();
+    if (!evidence->task_name[0] && s_evidence_task_name[0]) strlcpy(evidence->task_name, s_evidence_task_name, sizeof(evidence->task_name));
 #if CONFIG_ENABLE_SCREENSHOT
     /* Preview-only snapshots never mutate ESP-NOW, MQTT, pairing, radar or RPS state. */
     if (s_debug_preview && s_page == PAGE_FIND) {
@@ -128,6 +135,7 @@ static void render(void)
     else if (s_page == PAGE_TASKS) screen = ui_tasks_build(model, s_selected);
     else if (s_page == PAGE_REDEEM) screen = ui_redeem_build(model, s_selected);
     else if (s_page == PAGE_CONFIRM) screen = ui_confirm_build(model, s_confirm_kind, s_confirm_name, s_confirm_points, s_selected);
+    else if (s_page == PAGE_EVIDENCE) screen = ui_evidence_build(model, evidence);
     else if (s_page == PAGE_LOTTERY) screen = ui_lottery_build(model, s_lottery_rotation,
 #if CONFIG_ENABLE_SCREENSHOT
                                                                s_lottery_animating || (s_debug_preview && s_debug_lottery == DEBUG_LOTTERY_SPIN)
@@ -212,6 +220,13 @@ static void begin_confirm(confirm_kind_t kind, page_t back, const char *id, cons
     ui_text_limit_lines(name, s_confirm_name, sizeof(s_confirm_name), UI_TEXT_STANDARD_MAX_CHARS);
     s_confirm_points = points; go(PAGE_CONFIRM, 0);
 }
+static void begin_evidence(const char *id, const char *name)
+{
+    strlcpy(s_evidence_task_id, id, sizeof(s_evidence_task_id));
+    ui_text_limit_lines(name, s_evidence_task_name, sizeof(s_evidence_task_name), UI_TEXT_STANDARD_MAX_CHARS);
+    evidence_service_finish();
+    go(PAGE_EVIDENCE, 0);
+}
 static void handle_short_key(bsp_btn_t key)
 {
     app_model_snapshot_t *model = model_snapshot(); game_snapshot_t *game = game_snapshot();
@@ -228,8 +243,13 @@ static void handle_short_key(bsp_btn_t key)
         else { const app_task_t *t = &model->tasks[s_selected];
             if (!model->mqtt_online) set_message("当前离线，请联网再试", true);
             else if (t->completed_today) set_message("这个任务已经完成啦", false);
+            else if (t->evidence_required) { begin_evidence(t->id, t->name); return; }
             else if (!t->self_complete) set_message("这个任务不在这里完成", false);
             else { begin_confirm(CONFIRM_TASK, PAGE_TASKS, t->id, t->name, t->points); return; } render(); }
+    } else if (s_page == PAGE_EVIDENCE) {
+        evidence_service_snapshot_t *evidence = evidence_snapshot();
+        if (key == BSP_BTN_UP && !evidence->active) { go(PAGE_TASKS, 0); return; }
+        if (key == BSP_BTN_UP && evidence->active) { set_message("请先等语音提交完成", false); render(); return; }
     } else if (s_page == PAGE_REDEEM) {
         if (key != BSP_BTN_OK) key_move(delta, 2);
         else { int idx = ui_redeem_model_index(model, s_selected);
@@ -393,6 +413,9 @@ static void process_event(const app_event_t *event)
         if (event->button_event == BSP_BTN_RELEASE && event->button == BSP_BTN_DOWN && ptt_service_is_transmitting()) {
             ptt_service_set_transmitting(false); render(); return;
         }
+        if (event->button_event == BSP_BTN_RELEASE && event->button == BSP_BTN_DOWN && s_page == PAGE_EVIDENCE) {
+            evidence_service_stop(); render(); return;
+        }
         if (power_service_key_activity()) { s_suppress_wake_key = true; return; }
         if (s_suppress_wake_key) {
             if (event->button_event == BSP_BTN_CLICK || event->button_event == BSP_BTN_LONG || event->button_event == BSP_BTN_RELEASE) s_suppress_wake_key = false;
@@ -416,6 +439,11 @@ static void process_event(const app_event_t *event)
         if (event->button_event == BSP_BTN_LONG && event->button == BSP_BTN_DOWN && s_page == PAGE_FIND) {
             if (ptt_service_available()) ptt_service_set_transmitting(true);
             else set_message("对讲不可用\n需配对和70KB内存", true);
+            render(); return;
+        }
+        if (event->button_event == BSP_BTN_LONG && event->button == BSP_BTN_DOWN && s_page == PAGE_EVIDENCE) {
+            if (!evidence_service_available()) set_message("录音不可用", true);
+            else if (!evidence_service_begin(s_evidence_task_id, s_evidence_task_name)) set_message("当前无法开始录音", true);
             render(); return;
         }
         /* The 1-second B3 long event is deferred until release so a 5-second hold can
@@ -462,6 +490,7 @@ static void process_event(const app_event_t *event)
     } else if (event->type == APP_EVT_MODEL_CHANGED) { if (event->value) ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_cache_save_model()); render(); }
     else if (event->type == APP_EVT_ACTION_RESULT) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_cache_save_model()); app_model_snapshot_t *model = model_snapshot();
+        if (event->value == APP_PENDING_EVIDENCE) evidence_service_finish();
         if (event->ok && model->pending_type == APP_PENDING_LOTTERY) set_message("兑换成功\n正在等待开奖...", false); else set_message(event->text, !event->ok);
         sound_service_play(event->ok ? SOUND_DING : SOUND_DU); render();
     } else if (event->type == APP_EVT_LOTTERY_RESULT) {
@@ -513,7 +542,10 @@ static void process_event(const app_event_t *event)
                  strcmp(buzzer->status, "对方退出了游戏") == 0)
             go(PAGE_HOME, 0);
         else render();
+    } else if (event->type == APP_EVT_STATUS_UPDATE) {
+        set_message(event->text, !event->ok); render();
     } else if (event->type == APP_EVT_DATA_ERROR || event->type == APP_EVT_ACTION_TIMEOUT) {
+        evidence_service_finish();
         set_message(event->text[0] ? event->text : "请求超时，请重试", true); sound_service_play(SOUND_DU); render();
     } else render();
 }
@@ -555,6 +587,10 @@ static void ui_task(void *arg)
                     ui_mole_update(mole);
                     bsp_lvgl_unlock();
                 }
+            }
+            if (s_page == PAGE_EVIDENCE) {
+                evidence_service_snapshot_t *evidence = evidence_snapshot();
+                if (evidence->active || evidence->waiting_review) render();
             }
         }
         find_service_tick(now);

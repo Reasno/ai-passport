@@ -6,6 +6,7 @@
 #include "esp_timer.h"
 #include "find_service.h"
 #include "mbedtls/sha256.h"
+#include "mbedtls/base64.h"
 #include "mqtt_client.h"
 #include <stdio.h>
 #include <string.h>
@@ -19,7 +20,13 @@
 #define TOPIC_COMPLETE_V3 "kids_points/action/complete"
 #define TOPIC_COMPLETE_LEGACY "kids_points/action/complete_task"
 #define TOPIC_REDEEM "kids_points/action/redeem"
+#define TOPIC_EVIDENCE_START "kids_points/evidence/start"
+#define TOPIC_EVIDENCE_CHUNK "kids_points/evidence/chunk"
+#define TOPIC_EVIDENCE_COMMIT "kids_points/evidence/commit"
 #define ACTION_TIMEOUT_MS 5000
+#define EVIDENCE_TIMEOUT_MS 90000
+#define EVIDENCE_CHUNK_MAX_BYTES 480
+#define EVIDENCE_CHUNK_B64_MAX (((EVIDENCE_CHUNK_MAX_BYTES + 2) / 3) * 4 + 4)
 #define CONTENT_KEY_LEN 17
 
 typedef enum { PROTOCOL_UNKNOWN, PROTOCOL_LEGACY, PROTOCOL_V3 } protocol_mode_t;
@@ -214,6 +221,8 @@ static esp_err_t parse_task_item(const char *key, cJSON *root)
         task->points = points->valueint;
         task->completed_today = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(item, "done"));
         task->self_complete = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(item, "self_complete"));
+        cJSON *evidence_required = cJSON_GetObjectItemCaseSensitive(item, "evidence_required");
+        task->evidence_required = evidence_required ? cJSON_IsTrue(evidence_required) : !task->self_complete;
         s_task_slots[i].received = true;
         ESP_LOGI(TAG, "task item key=%s id=%s", key, task->id);
         assemble_tasks_if_complete();
@@ -261,6 +270,13 @@ static const char *friendly_error(const char *code)
         {"device_identity_mismatch", "设备身份不匹配\n请找爸爸妈妈"},
         {"invalid_payload", "请求格式有误\n请找爸爸妈妈"},
         {"invalid_child_id", "设备绑定有误\n请找爸爸妈妈"},
+        {"evidence_not_relevant", "这段语音还不够像完成证据"},
+        {"session_not_found", "录音会话不存在，请重试"},
+        {"chunk_out_of_order", "语音上传顺序错了，请重试"},
+        {"unsupported_codec", "语音格式暂不支持"},
+        {"duration_too_long", "录音太长啦，请控制在15秒内"},
+        {"session_busy", "还有一段语音正在提交"},
+        {"ai_review_failed", "AI 审核暂时不可用"},
     };
     if (!code) return NULL;
     for (size_t i = 0; i < sizeof(MAP) / sizeof(MAP[0]); i++) {
@@ -521,6 +537,49 @@ static bool publish_action(const char *item_field, const char *item_id, app_pend
 }
 bool mqtt_service_publish_complete_task(const char *task_id) { return publish_action("task_id", task_id, APP_PENDING_TASK); }
 bool mqtt_service_publish_redeem(const char *reward_id) { return publish_action("reward_id", reward_id, APP_PENDING_REDEEM); }
+
+static bool publish_json_topic(const char *topic, const char *payload)
+{
+    app_model_snapshot(&s_mqtt_publish_model);
+    if (!s_client || !s_mqtt_publish_model.mqtt_online || !topic || !payload) return false;
+    int msg_id = esp_mqtt_client_publish(s_client, topic, payload, 0, 1, false);
+    return msg_id >= 0;
+}
+
+bool mqtt_service_publish_evidence_start(const char *request_id, const char *task_id, uint32_t max_duration_ms, size_t chunk_bytes)
+{
+    if (!request_id || !task_id || !request_id[0] || !task_id[0]) return false;
+    char payload[384];
+    int written = snprintf(payload, sizeof(payload),
+                           "{\"request_id\":\"%s\",\"idempotency_key\":\"%s\",\"task_id\":\"%s\",\"child_id\":\"%s\",\"actor_child_id\":\"%s\",\"device_id\":\"%s\",\"account_id\":\"shared\",\"source\":\"ai_passport\",\"codec\":\"g711_ulaw\",\"sample_rate\":8000,\"channels\":1,\"max_duration_ms\":%lu,\"chunk_bytes\":%u}",
+                           request_id, request_id, task_id, CONFIG_ACTOR_CHILD_ID, CONFIG_ACTOR_CHILD_ID, s_device_id,
+                           (unsigned long)max_duration_ms, (unsigned)chunk_bytes);
+    return written > 0 && written < (int)sizeof(payload) && publish_json_topic(TOPIC_EVIDENCE_START, payload);
+}
+
+bool mqtt_service_publish_evidence_chunk(const char *request_id, uint32_t seq, const uint8_t *audio, size_t len)
+{
+    if (!request_id || !audio || len == 0 || len > EVIDENCE_CHUNK_MAX_BYTES) return false;
+    unsigned char encoded[EVIDENCE_CHUNK_B64_MAX];
+    size_t out_len = 0;
+    if (mbedtls_base64_encode(encoded, sizeof(encoded), &out_len, audio, len) != 0) return false;
+    encoded[out_len] = 0;
+    char payload[960];
+    int written = snprintf(payload, sizeof(payload),
+                           "{\"request_id\":\"%s\",\"seq\":%lu,\"audio_b64\":\"%s\"}",
+                           request_id, (unsigned long)seq, (const char *)encoded);
+    return written > 0 && written < (int)sizeof(payload) && publish_json_topic(TOPIC_EVIDENCE_CHUNK, payload);
+}
+
+bool mqtt_service_publish_evidence_commit(const char *request_id, const char *task_id, uint32_t total_chunks, const char *audio_sha256, uint32_t duration_ms)
+{
+    if (!request_id || !task_id || !audio_sha256) return false;
+    char payload[384];
+    int written = snprintf(payload, sizeof(payload),
+                           "{\"request_id\":\"%s\",\"task_id\":\"%s\",\"child_id\":\"%s\",\"total_chunks\":%lu,\"audio_sha256\":\"%s\",\"duration_ms\":%lu}",
+                           request_id, task_id, CONFIG_ACTOR_CHILD_ID, (unsigned long)total_chunks, audio_sha256, (unsigned long)duration_ms);
+    return written > 0 && written < (int)sizeof(payload) && publish_json_topic(TOPIC_EVIDENCE_COMMIT, payload);
+}
 
 static bool publish_find(const char *target, const char *suffix, uint32_t ts)
 {
