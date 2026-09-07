@@ -18,8 +18,6 @@
 #define EVIDENCE_CHUNK_BYTES 480
 #define EVIDENCE_SAMPLES_PER_PACKET 160
 
-static const char *TAG = "kp_evidence";
-
 typedef struct {
     bool available;
     bool active;
