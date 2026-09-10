@@ -491,7 +491,9 @@ static void process_event(const app_event_t *event)
     else if (event->type == APP_EVT_ACTION_RESULT) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_cache_save_model()); app_model_snapshot_t *model = model_snapshot();
         if (event->value == APP_PENDING_EVIDENCE) evidence_service_finish();
-        if (event->ok && model->pending_type == APP_PENDING_LOTTERY) set_message("兑换成功\n正在等待开奖...", false); else set_message(event->text, !event->ok);
+        if (event->value == APP_PENDING_EVIDENCE) set_message(event->ok ? "证据提交成功" : "提交失败\n请重试", !event->ok);
+        else if (event->ok && model->pending_type == APP_PENDING_LOTTERY) set_message("兑换成功\n正在等待开奖...", false);
+        else set_message(event->text, !event->ok);
         sound_service_play(event->ok ? SOUND_DING : SOUND_DU); render();
     } else if (event->type == APP_EVT_LOTTERY_RESULT) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_cache_save_model());
@@ -545,14 +547,17 @@ static void process_event(const app_event_t *event)
     } else if (event->type == APP_EVT_STATUS_UPDATE) {
         set_message(event->text, !event->ok); render();
     } else if (event->type == APP_EVT_DATA_ERROR || event->type == APP_EVT_ACTION_TIMEOUT) {
+        bool evidence_error = s_page == PAGE_EVIDENCE;
         evidence_service_finish();
-        set_message(event->text[0] ? event->text : "请求超时，请重试", true); sound_service_play(SOUND_DU); render();
+        set_message(evidence_error ? "提交失败\n请重试" : (event->text[0] ? event->text : "请求超时，请重试"), true);
+        sound_service_play(SOUND_DU); render();
     } else render();
 }
 static void ui_task(void *arg)
 {
     (void)arg; ui_app_init(); render(); ESP_LOGI(TAG, "UI启动 stack high-water=%u", (unsigned)uxTaskGetStackHighWaterMark(NULL));
     app_event_t event; int64_t next_game_tick = 0;
+    uint32_t last_evidence_second = UINT32_MAX;
     for (;;) {
         if (xQueueReceive(app_events_queue(), &event, pdMS_TO_TICKS(100)) == pdTRUE) {
             process_event(&event);
@@ -590,7 +595,15 @@ static void ui_task(void *arg)
             }
             if (s_page == PAGE_EVIDENCE) {
                 evidence_service_snapshot_t *evidence = evidence_snapshot();
-                if (evidence->active || evidence->waiting_review) render();
+                if (evidence->recording) {
+                    uint32_t current_second = evidence->elapsed_ms / 1000;
+                    if (current_second != last_evidence_second) {
+                        last_evidence_second = current_second;
+                        render();
+                    }
+                } else {
+                    last_evidence_second = UINT32_MAX;
+                }
             }
         }
         find_service_tick(now);
