@@ -491,7 +491,7 @@ static void process_event(const app_event_t *event)
     else if (event->type == APP_EVT_ACTION_RESULT) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_cache_save_model()); app_model_snapshot_t *model = model_snapshot();
         if (event->value == APP_PENDING_EVIDENCE) evidence_service_finish();
-        if (event->value == APP_PENDING_EVIDENCE) set_message(event->ok ? "证据提交成功" : "提交失败\n请重试", !event->ok);
+        if (event->value == APP_PENDING_EVIDENCE) set_message(event->ok ? "证据提交成功" : "审核失败", !event->ok);
         else if (event->ok && model->pending_type == APP_PENDING_LOTTERY) set_message("兑换成功\n正在等待开奖...", false);
         else set_message(event->text, !event->ok);
         sound_service_play(event->ok ? SOUND_DING : SOUND_DU); render();
@@ -549,7 +549,7 @@ static void process_event(const app_event_t *event)
     } else if (event->type == APP_EVT_DATA_ERROR || event->type == APP_EVT_ACTION_TIMEOUT) {
         bool evidence_error = s_page == PAGE_EVIDENCE;
         evidence_service_finish();
-        set_message(evidence_error ? "提交失败\n请重试" : (event->text[0] ? event->text : "请求超时，请重试"), true);
+        set_message(evidence_error ? "审核失败" : (event->text[0] ? event->text : "请求超时，请重试"), true);
         sound_service_play(SOUND_DU); render();
     } else render();
 }
