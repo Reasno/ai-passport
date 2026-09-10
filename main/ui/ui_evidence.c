@@ -10,8 +10,8 @@ lv_obj_t *ui_evidence_build(const app_model_snapshot_t *model, const evidence_se
     lv_obj_t *card = ui_common_card(screen, 12, 36, 216, 188, false, true);
     ui_pixel_icon_create(card, UI_PIXEL_ICON_TASK, 88, 10, KP_THEME, 3);
     char hint[160];
-    if (evidence->waiting_review) snprintf(hint, sizeof(hint), "语音已发送\nAI 正在检查");
-    else if (evidence->uploading) snprintf(hint, sizeof(hint), "正在发送语音...\n请稍候");
+    if (evidence->waiting_review) snprintf(hint, sizeof(hint), "AI审核中");
+    else if (evidence->uploading) snprintf(hint, sizeof(hint), "语音上传中");
     else if (evidence->recording) snprintf(hint, sizeof(hint), "录音中 %lu/%lu 秒\n松开 B2 提交",
                                            (unsigned long)(evidence->elapsed_ms / 1000),
                                            (unsigned long)(evidence->max_duration_ms / 1000));
