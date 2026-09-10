@@ -37,6 +37,7 @@ static int s_selected; static confirm_kind_t s_confirm_kind;
 static char s_confirm_id[APP_ID_LEN], s_confirm_name[APP_NAME_LEN]; static int s_confirm_points;
 static char s_evidence_task_id[APP_ID_LEN], s_evidence_task_name[APP_NAME_LEN];
 static char s_message[128]; static bool s_message_error; static int64_t s_message_until;
+static bool s_message_then_tasks;
 static int s_lottery_rotation; static bool s_lottery_animating; static int64_t s_lottery_reveal_at;
 static bool s_suppress_wake_key;
 static bool s_mole_page_created;
@@ -73,6 +74,7 @@ static void set_message(const char *text, bool error)
     ui_text_limit_lines(text, s_message, sizeof(s_message), UI_TEXT_STANDARD_MAX_CHARS);
     s_message_error = error;
     s_message_until = esp_timer_get_time() / 1000 + 2400;
+    s_message_then_tasks = false;
 }
 static void render(void)
 {
@@ -491,7 +493,10 @@ static void process_event(const app_event_t *event)
     else if (event->type == APP_EVT_ACTION_RESULT) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_cache_save_model()); app_model_snapshot_t *model = model_snapshot();
         if (event->value == APP_PENDING_EVIDENCE) evidence_service_finish();
-        if (event->value == APP_PENDING_EVIDENCE) set_message(event->ok ? "证据提交成功" : "审核失败", !event->ok);
+        if (event->value == APP_PENDING_EVIDENCE) {
+            set_message(event->ok ? "证据提交成功" : "审核失败", !event->ok);
+            s_message_then_tasks = event->ok;
+        }
         else if (event->ok && model->pending_type == APP_PENDING_LOTTERY) set_message("兑换成功\n正在等待开奖...", false);
         else set_message(event->text, !event->ok);
         sound_service_play(event->ok ? SOUND_DING : SOUND_DU); render();
@@ -638,7 +643,13 @@ static void ui_task(void *arg)
             sound_service_play(SOUND_FANFARE);
             render();
         }
-        if (s_message[0] && now >= s_message_until) { s_message[0] = 0; render(); }
+        if (s_message[0] && now >= s_message_until) {
+            s_message[0] = 0;
+            if (s_message_then_tasks) {
+                s_message_then_tasks = false;
+                go(PAGE_TASKS, 0);
+            } else render();
+        }
     }
 }
 esp_err_t ui_app_start(void) { return xTaskCreatePinnedToCore(ui_task, "kp_ui", 8192, NULL, 3, NULL, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM; }
