@@ -217,7 +217,7 @@ esp_err_t evidence_service_start(void)
     memset(&s_state, 0, sizeof(s_state));
     s_state.available = true;
     s_state.max_duration_ms = EVIDENCE_MAX_DURATION_MS;
-    if (xTaskCreatePinnedToCore(evidence_task, "kp_evidence", 4096, NULL, 4, NULL, 0) != pdPASS) return ESP_ERR_NO_MEM;
+    if (xTaskCreatePinnedToCore(evidence_task, "kp_evidence", 8192, NULL, 4, NULL, 0) != pdPASS) return ESP_ERR_NO_MEM;
     return ESP_OK;
 }
 
