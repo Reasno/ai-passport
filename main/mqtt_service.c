@@ -11,12 +11,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#define TOPIC_STATE "kids_points/state/shared"
-#define TOPIC_REWARDS "kids_points/rewards"
 #define TOPIC_RESULT_PREFIX "kids_points/action/result/"
 #define TOPIC_RESULT TOPIC_RESULT_PREFIX "+"
 #define TOPIC_ACTION_ERROR "kids_points/action/error"
-#define TOPIC_LOTTERY_SHARED "kids_points/lottery_result/shared"
 #define TOPIC_COMPLETE_V3 "kids_points/action/complete"
 #define TOPIC_COMPLETE_LEGACY "kids_points/action/complete_task"
 #define TOPIC_REDEEM "kids_points/action/redeem"
@@ -45,7 +42,7 @@ static const char *TAG = "kp_mqtt";
 static esp_mqtt_client_handle_t s_client;
 static bool s_started;
 static bool s_client_started;
-static char s_uri[96], s_tasks_topic[96], s_tasks_items_prefix[112], s_rewards_items_prefix[112];
+static char s_uri[96], s_state_topic[96], s_tasks_topic[96], s_tasks_items_prefix[112], s_rewards_topic[96], s_rewards_items_prefix[112];
 static char s_lottery_child_topic[96], s_presence_topic[96], s_client_id[64], s_device_id[64];
 static char s_find_ring_topic[112], s_find_ack_topic[112];
 static char s_rx_topic[128];
@@ -376,11 +373,11 @@ static void handle_payload(void)
     if (strncmp(s_rx_topic, TOPIC_RESULT_PREFIX, strlen(TOPIC_RESULT_PREFIX)) == 0 || topic_is(TOPIC_ACTION_ERROR)) {
         handle_result(s_rx_data, s_rx_total); return;
     }
-    if (topic_is(TOPIC_LOTTERY_SHARED) || topic_is(s_lottery_child_topic)) { handle_lottery(); return; }
+    if (topic_is(s_lottery_child_topic)) { handle_lottery(); return; }
 
     cJSON *root = cJSON_ParseWithLength(s_rx_data, s_rx_total);
     if (!root) { post_error("收到的数据格式错误，已保留旧数据"); return; }
-    if (topic_is(s_tasks_topic) || topic_is(TOPIC_REWARDS)) {
+    if (topic_is(s_tasks_topic) || topic_is(s_rewards_topic)) {
         bool tasks = topic_is(s_tasks_topic);
         if (parse_manifest(root, tasks)) { cJSON_Delete(root); return; }
         cJSON_Delete(root);
@@ -395,7 +392,7 @@ static void handle_payload(void)
         model_changed(true);
         return;
     }
-    if (topic_is(TOPIC_STATE)) {
+    if (topic_is(s_state_topic)) {
         cJSON_Delete(root);
         esp_err_t err = app_model_parse_balance(s_rx_data, s_rx_total);
         if (err == ESP_OK) { ESP_LOGI(TAG, "state snapshot parsed"); model_changed(true); }
@@ -429,12 +426,11 @@ static void subscribe_known_items(void)
 }
 static void subscribe_all_roots(esp_mqtt_client_handle_t client)
 {
-    esp_mqtt_client_subscribe(client, TOPIC_STATE, 1);
+    esp_mqtt_client_subscribe(client, s_state_topic, 1);
     esp_mqtt_client_subscribe(client, s_tasks_topic, 1);
-    esp_mqtt_client_subscribe(client, TOPIC_REWARDS, 1);
+    esp_mqtt_client_subscribe(client, s_rewards_topic, 1);
     esp_mqtt_client_subscribe(client, TOPIC_RESULT, 1);
     esp_mqtt_client_subscribe(client, TOPIC_ACTION_ERROR, 1);
-    esp_mqtt_client_subscribe(client, TOPIC_LOTTERY_SHARED, 1);
     esp_mqtt_client_subscribe(client, s_lottery_child_topic, 1);
     esp_mqtt_client_subscribe(client, s_find_ring_topic, 1);
     esp_mqtt_client_subscribe(client, s_find_ack_topic, 1);
@@ -479,9 +475,11 @@ esp_err_t mqtt_service_start(void)
 {
     if (s_started) return ESP_OK;
     snprintf(s_uri, sizeof(s_uri), "mqtt://%s:%d", CONFIG_MQTT_BROKER_HOST, CONFIG_MQTT_BROKER_PORT);
+    snprintf(s_state_topic, sizeof(s_state_topic), "kids_points/state/%s", CONFIG_ACTOR_CHILD_ID);
     snprintf(s_tasks_topic, sizeof(s_tasks_topic), "kids_points/tasks/%s", CONFIG_ACTOR_CHILD_ID);
     snprintf(s_tasks_items_prefix, sizeof(s_tasks_items_prefix), "%s/items/", s_tasks_topic);
-    snprintf(s_rewards_items_prefix, sizeof(s_rewards_items_prefix), "%s/items/", TOPIC_REWARDS);
+    snprintf(s_rewards_topic, sizeof(s_rewards_topic), "kids_points/rewards/%s", CONFIG_ACTOR_CHILD_ID);
+    snprintf(s_rewards_items_prefix, sizeof(s_rewards_items_prefix), "%s/items/", s_rewards_topic);
     snprintf(s_lottery_child_topic, sizeof(s_lottery_child_topic), "kids_points/lottery_result/%s", CONFIG_ACTOR_CHILD_ID);
     strlcpy(s_device_id, CONFIG_KIDS_DEVICE_ID, sizeof(s_device_id));
     snprintf(s_find_ring_topic, sizeof(s_find_ring_topic), "kids_points/game/find/%s/ring", CONFIG_KIDS_DEVICE_ID);
