@@ -14,4 +14,5 @@ bool mqtt_service_publish_evidence_commit(const char *request_id, const char *ta
  * can collapse the two transports into a single ring. */
 bool mqtt_service_publish_find_ring(uint32_t ts);
 bool mqtt_service_publish_find_ack(const char *target_device_id, uint32_t ts);
+bool mqtt_service_publish_notification_read(const char *notification_id);
 void mqtt_service_resubscribe(void);

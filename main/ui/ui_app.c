@@ -8,6 +8,7 @@
 #include "mole_game_service.h"
 #include "mqtt_service.h"
 #include "nvs_cache.h"
+#include "notification_service.h"
 #include "power_service.h"
 #include "privacy_mode.h"
 #include "ptt_service.h"
@@ -18,6 +19,7 @@
 #include "ui_games.h"
 #include "ui_home.h"
 #include "ui_lottery.h"
+#include "ui_notification.h"
 #include "lottery_assets.h"
 #include "ui_redeem.h"
 #include "ui_tasks.h"
@@ -55,6 +57,10 @@ static int s_debug_prize_index;
 #endif
 static bool s_find_waiting, s_find_ringing, s_find_flash, s_ignore_key_until_release, s_ignore_ring_click;
 static lv_obj_t *s_find_overlay;
+static lv_obj_t *s_notification_overlay;
+static bool s_notification_visible, s_notification_key_active, s_notification_swallow_click;
+static bsp_btn_t s_notification_active_button, s_notification_click_button;
+static notification_item_t s_notification_item;
 static int64_t s_find_deadline, s_find_ring_deadline, s_find_next_flash;
 static char s_find_status[64], s_find_sender[64];
 /* Large cross-module snapshots are static to preserve the measured-safe 4 KB UI stack. */
@@ -177,13 +183,81 @@ static void show_find_ring_overlay(void)
     }
     set_find_overlay_visible(true);
 }
+static void refresh_notification_overlay(void)
+{
+    size_t position = 0, count = 0;
+    bool available = notification_service_current(&s_notification_item, &position, &count);
+    if (!s_notification_overlay || !bsp_lvgl_lock(100)) return;
+    if (available && !s_find_ringing) {
+        ui_notification_show(s_notification_overlay, &s_notification_item, position, count);
+        s_notification_visible = true;
+    } else {
+        ui_notification_hide(s_notification_overlay);
+        s_notification_visible = false;
+    }
+    bsp_lvgl_unlock();
+}
+
+static bool handle_notification_key(const app_event_t *event)
+{
+    bool capturing = s_notification_visible || s_notification_key_active || s_notification_swallow_click;
+    if (capturing && event->button == BSP_BTN_DOWN && event->button_event == BSP_BTN_RELEASE) {
+        if (ptt_service_is_transmitting()) ptt_service_set_transmitting(false);
+        if (s_page == PAGE_EVIDENCE) evidence_service_stop();
+    }
+    if (s_notification_key_active && event->button == s_notification_active_button) {
+        if (event->button_event == BSP_BTN_RELEASE) {
+            s_notification_key_active = false;
+            s_notification_swallow_click = true;
+            s_notification_click_button = event->button;
+        }
+        return true;
+    }
+    if (s_notification_swallow_click && event->button == s_notification_click_button) {
+        if (event->button_event == BSP_BTN_CLICK) {
+            s_notification_swallow_click = false;
+            return true;
+        }
+        if (event->button_event == BSP_BTN_PRESS) s_notification_swallow_click = false;
+    }
+    if (!s_notification_visible) return false;
+
+    if (event->button_event == BSP_BTN_RELEASE || event->button_event == BSP_BTN_CLICK ||
+        event->button_event == BSP_BTN_LONG || event->button_event == BSP_BTN_HOLD_5S ||
+        event->button_event == BSP_BTN_DOUBLE) return true;
+    if (event->button_event != BSP_BTN_PRESS) return true;
+
+    s_notification_key_active = true;
+    s_notification_active_button = event->button;
+    if (event->button == BSP_BTN_UP) {
+        (void)mqtt_service_publish_notification_read(s_notification_item.id);
+        notification_service_mark_read(s_notification_item.id);
+        if (bsp_lvgl_lock(100)) {
+            ui_notification_hide(s_notification_overlay);
+            bsp_lvgl_unlock();
+        }
+        s_notification_visible = false;
+    } else if (event->button == BSP_BTN_DOWN) {
+        notification_service_next();
+        refresh_notification_overlay();
+    } else if (event->button == BSP_BTN_OK) {
+        if (bsp_lvgl_lock(100)) {
+            ui_notification_hide(s_notification_overlay);
+            bsp_lvgl_unlock();
+        }
+        s_notification_visible = false;
+    }
+    return true;
+}
+
 static void ui_app_init(void)
 {
     if (!bsp_lvgl_lock(1000)) {
-        ESP_LOGE(TAG, "Find overlay preallocation skipped: LVGL lock timeout");
+        ESP_LOGE(TAG, "Top-layer overlay preallocation skipped: LVGL lock timeout");
         return;
     }
     s_find_overlay = ui_common_find_overlay(lv_layer_top(), false);
+    s_notification_overlay = ui_notification_create(lv_layer_top());
     if (s_find_overlay) {
         lv_obj_add_flag(s_find_overlay, LV_OBJ_FLAG_HIDDEN);
         lv_mem_monitor_t monitor;
@@ -372,6 +446,7 @@ static void process_event(const app_event_t *event)
 {
     if (event->type == APP_EVT_KEY) {
         ESP_LOGI(TAG, "按键=%d event=%d", event->button, event->button_event);
+        if (handle_notification_key(event)) return;
         bool b3_pair_on_release = false;
         if (event->button == BSP_BTN_OK && event->button_event == BSP_BTN_PRESS) {
             s_b3_press_started = event->timestamp_ms;
@@ -400,6 +475,7 @@ static void process_event(const app_event_t *event)
             s_ignore_key_until_release = event->button_event == BSP_BTN_PRESS;
             s_ignore_ring_click = event->button_event == BSP_BTN_PRESS;
             set_find_overlay_visible(false);
+            refresh_notification_overlay();
             set_message("已告诉" KP_PEER_LABEL "：我在这里", false);
             return;
         }
@@ -477,6 +553,13 @@ static void process_event(const app_event_t *event)
         show_debug_page((app_debug_page_t)event->value);
 #endif
     } else if (event->type == APP_EVT_FIND_RING) {
+        s_notification_key_active = false;
+        s_notification_swallow_click = false;
+        s_notification_visible = false;
+        if (s_notification_overlay && bsp_lvgl_lock(100)) {
+            ui_notification_hide(s_notification_overlay);
+            bsp_lvgl_unlock();
+        }
         s_ignore_key_until_release = false;
         s_ignore_ring_click = false;
         strlcpy(s_find_sender, event->text, sizeof(s_find_sender));
@@ -549,6 +632,16 @@ static void process_event(const app_event_t *event)
                  strcmp(buzzer->status, "对方退出了游戏") == 0)
             go(PAGE_HOME, 0);
         else render();
+    } else if (event->type == APP_EVT_NOTIFICATION_SNAPSHOT) {
+        if (ptt_service_is_transmitting()) ptt_service_set_transmitting(false);
+        if (s_page == PAGE_EVIDENCE && evidence_snapshot()->active) evidence_service_stop();
+        s_b3_press_started = 0;
+        s_b3_privacy_consumed = false;
+        refresh_notification_overlay();
+        if (s_notification_visible) {
+            power_service_wake();
+            sound_service_play(SOUND_DING);
+        }
     } else if (event->type == APP_EVT_STATUS_UPDATE) {
         set_message(event->text, !event->ok); render();
     } else if (event->type == APP_EVT_DATA_ERROR || event->type == APP_EVT_ACTION_TIMEOUT) {
@@ -625,6 +718,7 @@ static void ui_task(void *arg)
             s_find_sender[0] = 0;
             s_find_status[0] = 0;
             set_find_overlay_visible(false);
+            refresh_notification_overlay();
             ESP_LOGI(TAG, "Find 被叫响铃已在30秒后自动停止，不发送ACK");
             render();
         }

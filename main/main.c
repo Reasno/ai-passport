@@ -1,6 +1,7 @@
 #include "app_events.h"
 #include "app_model.h"
 #include "nvs_cache.h"
+#include "notification_service.h"
 #include "battery_service.h"
 #include "buzzer_game_service.h"
 #include "espnow_service.h"
@@ -30,6 +31,7 @@ void app_main(void)
 {
     ESP_LOGI(TAG, "kids_points v1.0.0 actor=%s build=%s %s", CONFIG_ACTOR_CHILD_ID, __DATE__, __TIME__);
     app_model_init(); app_events_init();
+    ESP_ERROR_CHECK(notification_service_init());
     ESP_ERROR_CHECK(nvs_cache_init());
     ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_cache_load());
     app_model_reset_online_sync();

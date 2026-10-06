@@ -5,6 +5,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "find_service.h"
+#include "notification_service.h"
 #include "mbedtls/sha256.h"
 #include "mbedtls/base64.h"
 #include "mqtt_client.h"
@@ -20,6 +21,7 @@
 #define TOPIC_EVIDENCE_START "kids_points/evidence/start"
 #define TOPIC_EVIDENCE_CHUNK "kids_points/evidence/chunk"
 #define TOPIC_EVIDENCE_COMMIT "kids_points/evidence/commit"
+#define TOPIC_NOTIFICATION_READ "kids_points/notifications/read"
 #define ACTION_TIMEOUT_MS 5000
 #define EVIDENCE_TIMEOUT_MS 90000
 #define EVIDENCE_CHUNK_MAX_BYTES 480
@@ -44,7 +46,7 @@ static bool s_started;
 static bool s_client_started;
 static char s_uri[96], s_state_topic[96], s_tasks_topic[96], s_tasks_items_prefix[112], s_rewards_topic[96], s_rewards_items_prefix[112];
 static char s_lottery_child_topic[96], s_presence_topic[96], s_client_id[64], s_device_id[64];
-static char s_find_ring_topic[112], s_find_ack_topic[112];
+static char s_find_ring_topic[112], s_find_ack_topic[112], s_notifications_topic[112];
 static char s_rx_topic[128];
 static char s_rx_data[APP_JSON_MAX + 1];
 static int s_rx_total;
@@ -374,6 +376,14 @@ static void handle_payload(void)
         handle_result(s_rx_data, s_rx_total); return;
     }
     if (topic_is(s_lottery_child_topic)) { handle_lottery(); return; }
+    if (topic_is(s_notifications_topic)) {
+        esp_err_t err = notification_service_apply_json(s_rx_data, s_rx_total);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "notification snapshot invalid: %s", esp_err_to_name(err));
+            post_error("通知数据格式错误，已保留旧数据");
+        }
+        return;
+    }
 
     cJSON *root = cJSON_ParseWithLength(s_rx_data, s_rx_total);
     if (!root) { post_error("收到的数据格式错误，已保留旧数据"); return; }
@@ -434,6 +444,7 @@ static void subscribe_all_roots(esp_mqtt_client_handle_t client)
     esp_mqtt_client_subscribe(client, s_lottery_child_topic, 1);
     esp_mqtt_client_subscribe(client, s_find_ring_topic, 1);
     esp_mqtt_client_subscribe(client, s_find_ack_topic, 1);
+    esp_mqtt_client_subscribe(client, s_notifications_topic, 1);
     subscribe_known_items();
 }
 
@@ -484,6 +495,7 @@ esp_err_t mqtt_service_start(void)
     strlcpy(s_device_id, CONFIG_KIDS_DEVICE_ID, sizeof(s_device_id));
     snprintf(s_find_ring_topic, sizeof(s_find_ring_topic), "kids_points/game/find/%s/ring", CONFIG_KIDS_DEVICE_ID);
     snprintf(s_find_ack_topic, sizeof(s_find_ack_topic), "kids_points/game/find/%s/ack", CONFIG_KIDS_DEVICE_ID);
+    snprintf(s_notifications_topic, sizeof(s_notifications_topic), "kids_points/notifications/%s", CONFIG_ACTOR_CHILD_ID);
     snprintf(s_client_id, sizeof(s_client_id), "ai_passport_%s_001", CONFIG_ACTOR_CHILD_ID);
     snprintf(s_presence_topic, sizeof(s_presence_topic), "kids_points/device/%s/online", s_device_id);
     esp_mqtt_client_config_t cfg = {
@@ -577,6 +589,22 @@ bool mqtt_service_publish_evidence_commit(const char *request_id, const char *ta
                            "{\"request_id\":\"%s\",\"task_id\":\"%s\",\"child_id\":\"%s\",\"total_chunks\":%lu,\"audio_sha256\":\"%s\",\"duration_ms\":%lu}",
                            request_id, task_id, CONFIG_ACTOR_CHILD_ID, (unsigned long)total_chunks, audio_sha256, (unsigned long)duration_ms);
     return written > 0 && written < (int)sizeof(payload) && publish_json_topic(TOPIC_EVIDENCE_COMMIT, payload);
+}
+
+bool mqtt_service_publish_notification_read(const char *notification_id)
+{
+    if (!notification_id || strncmp(notification_id, "ntf_", 4) != 0) return false;
+    cJSON *root = cJSON_CreateObject();
+    if (!root) return false;
+    cJSON_AddStringToObject(root, "notification_id", notification_id);
+    cJSON_AddStringToObject(root, "child_id", CONFIG_ACTOR_CHILD_ID);
+    cJSON_AddStringToObject(root, "device_id", s_device_id);
+    char *payload = cJSON_PrintUnformatted(root);
+    bool sent = payload && publish_json_topic(TOPIC_NOTIFICATION_READ, payload);
+    cJSON_free(payload);
+    cJSON_Delete(root);
+    ESP_LOGI(TAG, "notification read id=%s sent=%d", notification_id, sent);
+    return sent;
 }
 
 static bool publish_find(const char *target, const char *suffix, uint32_t ts)
