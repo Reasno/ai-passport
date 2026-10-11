@@ -452,7 +452,7 @@ static void process_event(const app_event_t *event)
             s_b3_press_started = event->timestamp_ms;
             s_b3_privacy_consumed = false;
             if (s_page == PAGE_MOLE) s_mole_b3_block_click = false;
-        } else if (event->button == BSP_BTN_OK && event->button_event == BSP_BTN_HOLD_5S) {
+        } else if (event->button == BSP_BTN_OK && event->button_event == BSP_BTN_HOLD_5S && s_page == PAGE_HOME) {
             privacy_mode_toggle();
             s_b3_privacy_consumed = true;
             if (s_page == PAGE_MOLE) s_mole_b3_block_click = true;
@@ -532,7 +532,7 @@ static void process_event(const app_event_t *event)
             s_mole_b3_block_click = false;
             return;
         }
-        if (b3_pair_on_release && (s_page == PAGE_HOME || s_page == PAGE_GAMES)) {
+        if (b3_pair_on_release && s_page == PAGE_GAMES) {
             if (game_service_heap_allows_pairing()) { game_service_start_pairing(); go(PAGE_GAMES, 0); }
             else { set_message("内存不足，无法配对", true); render(); }
             return;
