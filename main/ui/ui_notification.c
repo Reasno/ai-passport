@@ -1,5 +1,6 @@
 #include "ui_notification.h"
 
+#include "ui_common.h"
 #include "ui_fonts.h"
 #include "ui_text.h"
 #include <stdio.h>
@@ -53,7 +54,8 @@ lv_obj_t *ui_notification_create(lv_obj_t *parent)
     lv_obj_t *counter = make_label(card, 14, 151, 192, 22, LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_text_color(counter, lv_color_hex(0xA9B9CA), 0);
     lv_obj_t *hint = make_label(card, 8, 179, 204, 24, LV_TEXT_ALIGN_CENTER);
-    lv_obj_set_style_text_color(hint, lv_color_hex(0x52D3B0), 0);
+    lv_obj_set_style_text_font(hint, UI_FONT_SMALL, 0);
+    lv_obj_set_style_text_color(hint, lv_color_hex(KP_MUTED), 0);
     lv_label_set_text(hint, "B1已读  B2下一条  B3关闭");
 
     lv_obj_add_flag(overlay, LV_OBJ_FLAG_HIDDEN);
