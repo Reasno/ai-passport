@@ -21,7 +21,7 @@
 #define KP_THEME 0x4B9EFF
 #endif
 lv_obj_t *ui_common_screen(const char *title, const app_model_snapshot_t *model);
-lv_obj_t *ui_statusbar_create(lv_obj_t *parent, const app_model_snapshot_t *model);
+lv_obj_t *ui_statusbar_create(lv_obj_t *parent, const app_model_snapshot_t *model, bool show_time);
 /** Keep status text/icons above an overlapping Home avatar without painting an opaque band. */
 void ui_statusbar_home_foreground(lv_obj_t *bar);
 void ui_statusbar_update(const app_model_snapshot_t *model);

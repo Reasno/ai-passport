@@ -74,9 +74,13 @@ lv_obj_t *ui_home_build(const app_model_snapshot_t *model, int selected)
     pill_label(progress, pv, UI_FONT_SMALL, KP_GREEN, 11);
     entry(screen, 8, selected == 0, UI_PIXEL_ICON_TASK, "今日任务");
     entry(screen, 85, selected == 1, UI_PIXEL_ICON_GIFT, "兑换奖品");
+#if CONFIG_KIDS_ENABLE_GAMES
     entry(screen, 162, selected == 2, UI_PIXEL_ICON_GAME, "互动游戏");
+#else
+    entry(screen, 162, selected == 2, UI_PIXEL_ICON_CHECK, "积分流水");
+#endif
     ui_common_footer(screen, "B1 B2选择  B3确认  长按B1主页", model->pending_type != APP_PENDING_NONE);
-    lv_obj_t *statusbar = ui_statusbar_create(screen, model);
+    lv_obj_t *statusbar = ui_statusbar_create(screen, model, true);
     lv_obj_move_foreground(avatar);
     ui_statusbar_home_foreground(statusbar);
     return screen;

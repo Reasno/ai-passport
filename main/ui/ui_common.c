@@ -65,7 +65,7 @@ static void update_time_label(bool wifi_online)
 
 void ui_statusbar_update(const app_model_snapshot_t *model)
 {
-    if (!s_wifi_icon || !s_battery_text || !s_time_text) return;
+    if (!s_wifi_icon || !s_battery_text) return;
     app_model_snapshot_t snapshot;
     if (!model) { app_model_snapshot(&snapshot); model = &snapshot; }
 
@@ -87,14 +87,17 @@ static void statusbar_timer_cb(lv_timer_t *timer)
     ui_statusbar_update(NULL);
 }
 
-lv_obj_t *ui_statusbar_create(lv_obj_t *parent, const app_model_snapshot_t *model)
+lv_obj_t *ui_statusbar_create(lv_obj_t *parent, const app_model_snapshot_t *model, bool show_time)
 {
     lv_obj_t *bar = lv_obj_create(parent); base_obj(bar); lv_obj_set_pos(bar, 0, 0); lv_obj_set_size(bar, 240, 20);
     lv_obj_set_style_bg_color(bar, lv_color_hex(KP_BG), 0); lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, 0);
 
     /* Time on the left (or --:-- until SNTP is ready). */
-    s_time_text = ui_common_label_small(bar, "--:--", 6, 1, 60, LV_TEXT_ALIGN_LEFT);
-    lv_obj_set_style_text_color(s_time_text, lv_color_hex(KP_MUTED_LIGHT), 0);
+    s_time_text = NULL;
+    if (show_time) {
+        s_time_text = ui_common_label_small(bar, "--:--", 6, 1, 60, LV_TEXT_ALIGN_LEFT);
+        lv_obj_set_style_text_color(s_time_text, lv_color_hex(KP_MUTED_LIGHT), 0);
+    }
 
     /* Keep battery compact: icon immediately followed by the percent label. */
     s_wifi_icon = ui_pixel_icon_create(bar, UI_PIXEL_ICON_WIFI, 166, 4, KP_MUTED, 1);
@@ -117,7 +120,7 @@ lv_obj_t *ui_common_screen(const char *title, const app_model_snapshot_t *model)
 {
     lv_obj_t *screen = lv_obj_create(NULL); base_obj(screen); lv_obj_set_style_bg_color(screen, lv_color_hex(KP_BG), 0);
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
-    lv_obj_t *bar = ui_statusbar_create(screen, model);
+    lv_obj_t *bar = ui_statusbar_create(screen, model, false);
     (void)bar;
     /* Keep sub-page headers compact: title-only content on the left, status on the right. */
     lv_obj_t *title_label = ui_common_label(screen, title, 8, 1, 144, LV_TEXT_ALIGN_LEFT, false);

@@ -39,16 +39,16 @@ TITLE_TEXT = """
 """ + "！？：0123456789"
 
 
-def gb2312_level1():
+def gb2312_hanzi():
     chars = []
-    for high in range(0xB0, 0xD8):
+    for high in range(0xB0, 0xF8):
         for low in range(0xA1, 0xFF):
             try:
                 chars.append(bytes((high, low)).decode("gb2312"))
             except UnicodeDecodeError:
                 pass
-    if len(chars) != 3755:
-        raise SystemExit(f"GB2312 level-1 count mismatch: {len(chars)}")
+    if len(chars) != 6763:
+        raise SystemExit(f"GB2312 Hanzi count mismatch: {len(chars)}")
     return "".join(chars)
 
 
@@ -122,7 +122,7 @@ def required_sets():
     source = static_source_chars()
     return {
         14: unique(ASCII_PUNCT + SMALL_TEXT + source),
-        18: unique(ASCII_PUNCT + gb2312_level1() + source),
+        18: unique(ASCII_PUNCT + gb2312_hanzi() + source),
         24: unique(ASCII_PUNCT + TITLE_TEXT + source + EXPLICIT_CHILD_NAME_CHARS),
     }
 
@@ -135,8 +135,8 @@ def audit(required):
             preview = "".join(chr(cp) for cp in missing[:80])
             raise SystemExit(f"{size}px missing {len(missing)} glyph(s): {preview}")
         print(f"{size}px: glyphs={len(glyphs)} required={len(set(required[size]))} coverage=100%")
-    dynamic = set(gb2312_level1()) | set(ASCII_PUNCT)
-    print(f"dynamic 18px contract: ASCII + GB2312 level-1 ({len(dynamic)} unique glyphs); outside range falls back to '?'")
+    dynamic = set(gb2312_hanzi()) | set(ASCII_PUNCT)
+    print(f"dynamic 18px contract: ASCII + GB2312 Hanzi ({len(dynamic)} unique glyphs); outside range falls back to '?'")
 
 
 def generate(font, required):

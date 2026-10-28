@@ -11,6 +11,10 @@ usage() {
 run_static_checks() {
     local actionlint_bin
     local test_dir
+    local dead_strip_flag="-Wl,--gc-sections"
+    if [[ "$(uname -s)" == Darwin ]]; then
+        dead_strip_flag="-Wl,-dead_strip"
+    fi
 
     python3 tools/check_repo.py
 
@@ -36,6 +40,10 @@ run_static_checks() {
         tests/test_notification_store.c main/notification_store.c \
         -o "${test_dir}/test_notification_store"
     "${test_dir}/test_notification_store"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        tests/test_power_policy.c main/power_policy.c \
+        -o "${test_dir}/test_power_policy"
+    "${test_dir}/test_power_policy"
     "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Icomponents/bsp/src \
         tests/test_bsp_display_rounding.c components/bsp/src/bsp_display_rounding.c \
         -o "${test_dir}/test_bsp_display_rounding"
@@ -61,10 +69,11 @@ run_static_checks() {
     for demo in audio low_power wifi; do
         "${CC:-cc}" -std=c11 -Wall -Wextra -Werror \
             -ffunction-sections -fdata-sections -Itests/demo_stubs -Imain \
-            "tests/test_demo_${demo}_runtime.c" -Wl,--gc-sections \
+            "tests/test_demo_${demo}_runtime.c" "${dead_strip_flag}" \
             -o "${test_dir}/test_demo_${demo}_runtime"
         "${test_dir}/test_demo_${demo}_runtime"
     done
+    PYTHONDONTWRITEBYTECODE=1 python3 tests/test_power_runtime.py
     PYTHONDONTWRITEBYTECODE=1 python3 tests/test_deep_sleep_contract.py
     PYTHONDONTWRITEBYTECODE=1 python3 tests/test_check_repo.py
     PYTHONDONTWRITEBYTECODE=1 python3 tests/test_verify_firmware.py
@@ -84,6 +93,15 @@ run_firmware_checks() (
 
     validation_build_dir="$(mktemp -d /tmp/ai-passport-firmware.XXXXXX)"
     trap 'case "${validation_build_dir}" in /tmp/ai-passport-firmware.*) rm -rf -- "${validation_build_dir}" ;; esac' EXIT
+
+    # Use the pinned firmware JSON library for protocol tests, without making
+    # the standalone static gate depend on an installed ESP-IDF checkout.
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        -I"${IDF_PATH}/components/json/cJSON" tests/test_ledger_store.c \
+        main/ledger_store.c main/notification_store.c \
+        "${IDF_PATH}/components/json/cJSON/cJSON.c" -lm \
+        -o "${validation_build_dir}/test_ledger_store"
+    "${validation_build_dir}/test_ledger_store"
 
     SDKCONFIG_DEFAULTS="${repo_root}/sdkconfig.defaults" \
         idf.py -B "${validation_build_dir}" \

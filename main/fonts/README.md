@@ -1,15 +1,21 @@
-# kids_points 中文字体生成
+<p align="right"><a href="README.zh_CN.md">简体中文</a> · <strong>English</strong></p>
 
-固件内置三套真实字体：
+# Kids Points fonts
 
-- `lv_font_noto_sc_14.c`：Noto Sans SC Regular 14px，仅包含 Home 紧凑控件固定文案。
-- `lv_font_noto_sc_18.c`：Noto Sans SC Regular 18px，ASCII、常用标点和 GB2312 一级汉字（3755 字），用于所有动态 MQTT 文本。
-- `lv_font_noto_sc_24.c`：Noto Sans SC Regular 24px，仅包含产品 UI 固定文案、数字、ASCII 和常用标点，不宣称覆盖动态汉字；动态任务名/奖品名始终使用 18px。
+The firmware uses Noto Sans SC Regular as uncompressed 4bpp LVGL fonts in
+read-only Flash. The 14px and 24px subsets cover fixed UI text. The 18px body
+font covers printable ASCII, punctuation, all 6,763 GB2312 level-1/level-2
+Hanzi, and fixed UI characters. Dynamic task, reward, notification and ledger
+text uses 18px. Unsupported characters display as `?`; arbitrary Unicode is
+not guaranteed.
 
-重新生成：
+Generate with a licensed Noto Sans SC Regular font:
 
 ```bash
 python3 tools/generate_kids_fonts.py /path/to/NotoSansSC-Regular.ttf
 ```
 
-脚本通过 `npx --yes lv_font_conv@1.5.3` 固定转换器版本，使用 4bpp LVGL 格式。脚本自动按 GB2312 编码 16～55 区生成一级字表，并校验恰好 3755 个汉字。
+The generator pins `lv_font_conv@1.5.3`, validates the GB2312 inventory and
+audits the generated cmap for each size. Audit checked-in assets with
+`python3 tools/generate_kids_fonts.py --audit-only`.
+Font coverage does not replace on-device rendering and heap measurements.

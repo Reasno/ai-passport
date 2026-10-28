@@ -4,13 +4,16 @@
 #include "cJSON.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "esp_random.h"
 #include "find_service.h"
 #include "notification_service.h"
+#include "ledger_service.h"
 #include "mbedtls/sha256.h"
 #include "mbedtls/base64.h"
 #include "mqtt_client.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdatomic.h>
 
 #define TOPIC_RESULT_PREFIX "kids_points/action/result/"
 #define TOPIC_RESULT TOPIC_RESULT_PREFIX "+"
@@ -44,6 +47,7 @@ static const char *TAG = "kp_mqtt";
 static esp_mqtt_client_handle_t s_client;
 static bool s_started;
 static bool s_client_started;
+static atomic_bool s_stopping;
 static char s_uri[96], s_state_topic[96], s_tasks_topic[96], s_tasks_items_prefix[112], s_rewards_topic[96], s_rewards_items_prefix[112];
 static char s_lottery_child_topic[96], s_presence_topic[96], s_client_id[64], s_device_id[64];
 static char s_find_ring_topic[112], s_find_ack_topic[112], s_notifications_topic[112];
@@ -358,6 +362,7 @@ static void handle_lottery(void)
 
 static void handle_payload(void)
 {
+#if CONFIG_KIDS_ENABLE_GAMES
     if (topic_is(s_find_ring_topic) || topic_is(s_find_ack_topic)) {
         cJSON *root = cJSON_ParseWithLength(s_rx_data, s_rx_total);
         if (!root) { ESP_LOGW(TAG, "Find payload invalid JSON"); return; }
@@ -370,6 +375,11 @@ static void handle_payload(void)
             find_service_on_mqtt(topic_is(s_find_ring_topic), sender, ts);
         }
         cJSON_Delete(root);
+        return;
+    }
+#endif
+    if (topic_is("kids_points/ledger/" CONFIG_ACTOR_CHILD_ID "/response")) {
+        ledger_service_receive(s_rx_data, s_rx_total);
         return;
     }
     if (strncmp(s_rx_topic, TOPIC_RESULT_PREFIX, strlen(TOPIC_RESULT_PREFIX)) == 0 || topic_is(TOPIC_ACTION_ERROR)) {
@@ -442,8 +452,11 @@ static void subscribe_all_roots(esp_mqtt_client_handle_t client)
     esp_mqtt_client_subscribe(client, TOPIC_RESULT, 1);
     esp_mqtt_client_subscribe(client, TOPIC_ACTION_ERROR, 1);
     esp_mqtt_client_subscribe(client, s_lottery_child_topic, 1);
+#if CONFIG_KIDS_ENABLE_GAMES
     esp_mqtt_client_subscribe(client, s_find_ring_topic, 1);
     esp_mqtt_client_subscribe(client, s_find_ack_topic, 1);
+#endif
+    esp_mqtt_client_subscribe(client, "kids_points/ledger/" CONFIG_ACTOR_CHILD_ID "/response", 1);
     esp_mqtt_client_subscribe(client, s_notifications_topic, 1);
     subscribe_known_items();
 }
@@ -517,14 +530,23 @@ esp_err_t mqtt_service_start(void)
     s_started = true;
     return ESP_OK;
 }
-void mqtt_service_on_ip_ready(void) { if (mqtt_service_start() == ESP_OK && !s_client_started) { esp_err_t err = esp_mqtt_client_start(s_client); if (err == ESP_OK) s_client_started = true; else ESP_LOGE(TAG, "MQTT启动失败: %s", esp_err_to_name(err)); } }
+void mqtt_service_on_ip_ready(void) { if (!atomic_load(&s_stopping) && mqtt_service_start() == ESP_OK && !s_client_started) { esp_err_t err = esp_mqtt_client_start(s_client); if (err == ESP_OK) s_client_started = true; else ESP_LOGE(TAG, "MQTT启动失败: %s", esp_err_to_name(err)); } }
+void mqtt_service_stop(void)
+{
+    atomic_store(&s_stopping, true);
+    if (s_client && s_client_started) {
+        esp_mqtt_client_stop(s_client);
+        s_client_started = false;
+    }
+}
 void mqtt_service_resubscribe(void) { if (s_client) subscribe_all_roots(s_client); }
 
 static bool publish_action(const char *item_field, const char *item_id, app_pending_type_t type)
 {
     app_model_snapshot(&s_mqtt_publish_model);
     if (!s_client || !s_mqtt_publish_model.mqtt_online || s_mqtt_publish_model.pending_type != APP_PENDING_NONE) return false;
-    char key[64]; snprintf(key, sizeof(key), "req_%lld", (long long)(esp_timer_get_time() / 1000));
+    char key[64]; snprintf(key, sizeof(key), "req_%08lx_%08lx_%lld",
+        (unsigned long)esp_random(), (unsigned long)esp_random(), (long long)(esp_timer_get_time() / 1000));
     bool legacy = type == APP_PENDING_TASK && s_tasks_mode == PROTOCOL_LEGACY;
     const char *topic = type == APP_PENDING_TASK ? (legacy ? TOPIC_COMPLETE_LEGACY : TOPIC_COMPLETE_V3) : TOPIC_REDEEM;
     cJSON *root = cJSON_CreateObject();
@@ -554,6 +576,16 @@ static bool publish_json_topic(const char *topic, const char *payload)
     if (!s_client || !s_mqtt_publish_model.mqtt_online || !topic || !payload) return false;
     int msg_id = esp_mqtt_client_publish(s_client, topic, payload, 0, 1, false);
     return msg_id >= 0;
+}
+
+bool mqtt_service_publish_ledger(const char *request_id, uint64_t before_id)
+{
+    char payload[160];
+    int len = snprintf(payload, sizeof(payload),
+        "{\"request_id\":\"%s\",\"before_id\":%llu,\"limit\":2}",
+        request_id, (unsigned long long)before_id);
+    return len > 0 && len < sizeof(payload) &&
+        publish_json_topic("kids_points/ledger/" CONFIG_ACTOR_CHILD_ID "/request", payload);
 }
 
 bool mqtt_service_publish_evidence_start(const char *request_id, const char *task_id, uint32_t max_duration_ms, size_t chunk_bytes)

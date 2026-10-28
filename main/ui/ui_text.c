@@ -83,7 +83,7 @@ void ui_text_font_fallback(const lv_font_t *font, char *text)
                          ((read[2] & 0x3F) << 6) | (read[3] & 0x3F);
         lv_font_glyph_dsc_t glyph;
         bool supported = codepoint == '\n' || codepoint == '\r' || codepoint == '\t' ||
-                         lv_font_get_glyph_dsc(font, &glyph, codepoint, 0);
+                         (lv_font_get_glyph_dsc(font, &glyph, codepoint, 0) && !glyph.is_placeholder);
         if (supported) {
             memmove(write, read, bytes);
             write += bytes;

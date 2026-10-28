@@ -17,5 +17,7 @@ typedef enum {
 esp_err_t sound_service_start(void);
 void sound_service_play(sound_effect_t effect);
 void sound_service_stop_ring(void);
+/* Terminal shutdown only: retain the audio lock until deep sleep/restart. */
+bool sound_service_prepare_sleep(void);
 bool sound_service_audio_lock(TickType_t wait);
 void sound_service_audio_unlock(void);

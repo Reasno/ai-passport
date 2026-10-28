@@ -9,6 +9,8 @@
 static const char *TAG = "kp_battery";
 static SemaphoreHandle_t s_lock;
 static battery_snapshot_t s_state;
+static TaskHandle_t s_task;
+static SemaphoreHandle_t s_stopped;
 
 static void battery_task(void *arg)
 {
@@ -28,15 +30,28 @@ static void battery_task(void *arg)
         xSemaphoreGive(s_lock);
         if (changed) app_event_post(&(app_event_t){.type = APP_EVT_STATUS_UPDATE}, 0);
         if (soc < 0 && init == ESP_OK) ESP_LOGW(TAG, "CW2017 SOC read failed; keeping UI safe");
-        vTaskDelay(pdMS_TO_TICKS(30000));
+        if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(30000))) break;
     }
+    xSemaphoreGive(s_stopped);
+    for (;;) vTaskSuspend(NULL);
 }
 
 esp_err_t battery_service_start(void)
 {
     s_lock = xSemaphoreCreateMutex();
-    if (!s_lock) return ESP_ERR_NO_MEM;
-    return xTaskCreatePinnedToCore(battery_task, "kp_battery", 2048, NULL, 2, NULL, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
+    s_stopped = xSemaphoreCreateBinary();
+    if (!s_lock || !s_stopped) return ESP_ERR_NO_MEM;
+    return xTaskCreatePinnedToCore(battery_task, "kp_battery", 2048, NULL, 2, &s_task, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
+}
+
+esp_err_t battery_service_stop(void)
+{
+    if (!s_task) return ESP_OK;
+    xTaskNotifyGive(s_task);
+    if (xSemaphoreTake(s_stopped, pdMS_TO_TICKS(6000)) != pdTRUE) return ESP_ERR_TIMEOUT;
+    vTaskDelete(s_task);
+    s_task = NULL;
+    return ESP_OK;
 }
 
 void battery_service_snapshot(battery_snapshot_t *out)

@@ -2,6 +2,7 @@
 #include "app_model.h"
 #include "nvs_cache.h"
 #include "notification_service.h"
+#include "ledger_service.h"
 #include "battery_service.h"
 #include "buzzer_game_service.h"
 #include "espnow_service.h"
@@ -32,20 +33,19 @@ void app_main(void)
     ESP_LOGI(TAG, "kids_points v1.0.0 actor=%s build=%s %s", CONFIG_ACTOR_CHILD_ID, __DATE__, __TIME__);
     app_model_init(); app_events_init();
     ESP_ERROR_CHECK(notification_service_init());
+    ESP_ERROR_CHECK(ledger_service_init());
     ESP_ERROR_CHECK(nvs_cache_init());
     ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_cache_load());
     app_model_reset_online_sync();
     ESP_ERROR_CHECK(bsp_i2c_init());
     ESP_ERROR_CHECK(bsp_display_init());
     if (!bsp_lvgl_init()) { ESP_LOGE(TAG, "LVGL初始化失败"); return; }
-    ESP_ERROR_CHECK(power_service_start());
     ESP_ERROR_CHECK_WITHOUT_ABORT(battery_service_start());
-    ESP_ERROR_CHECK(ui_app_start());
-    ESP_ERROR_CHECK_WITHOUT_ABORT(screenshot_service_start());
-    ESP_ERROR_CHECK(bsp_button_init(on_key, NULL));
     esp_err_t audio = sound_service_start();
     if (audio != ESP_OK) ESP_LOGW(TAG, "音效不可用: %s", esp_err_to_name(audio));
     esp_err_t wifi = wifi_service_start();
+    if (audio == ESP_OK) ESP_ERROR_CHECK_WITHOUT_ABORT(evidence_service_start());
+#if CONFIG_KIDS_ENABLE_GAMES
     /* Find de-duplication must exist before either transport can deliver a ring. */
     ESP_ERROR_CHECK_WITHOUT_ABORT(find_service_start());
     if (wifi != ESP_OK) ESP_LOGW(TAG, "WiFi后台启动失败: %s，继续离线模式", esp_err_to_name(wifi));
@@ -57,9 +57,15 @@ void app_main(void)
             ESP_ERROR_CHECK_WITHOUT_ABORT(mole_game_service_start());
             if (audio == ESP_OK) {
                 ESP_ERROR_CHECK_WITHOUT_ABORT(ptt_service_start());
-                ESP_ERROR_CHECK_WITHOUT_ABORT(evidence_service_start());
             } else ESP_LOGW(TAG, "PTT灰化: 音频RX不可用（codec初始化失败）");
         } else ESP_LOGW(TAG, "ESP-NOW互动不可用: %s", esp_err_to_name(now));
     }
+#else
+    if (wifi != ESP_OK) ESP_LOGW(TAG, "Wi-Fi unavailable: %s", esp_err_to_name(wifi));
+#endif
+    ESP_ERROR_CHECK(power_service_start());
+    ESP_ERROR_CHECK(ui_app_start());
+    ESP_ERROR_CHECK_WITHOUT_ABORT(screenshot_service_start());
+    ESP_ERROR_CHECK(bsp_button_init(on_key, NULL));
     xTaskCreatePinnedToCore(heap_log_task, "kp_heap", 2048, NULL, 1, NULL, 0);
 }

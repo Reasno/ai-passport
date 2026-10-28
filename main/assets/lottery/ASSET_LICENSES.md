@@ -1,10 +1,12 @@
-# 大转盘奖励素材许可
+<p align="right"><a href="ASSET_LICENSES.zh_CN.md">简体中文</a> · <strong>English</strong></p>
 
-- `lottery_source_burger_kenney_cc0.png` 及其派生图：Kenney《Pixel Platformer: Food Expansion》，CC0 1.0。
+# Lottery asset licenses
+
+- `lottery_source_burger_kenney_cc0.png` and derivatives: Kenney, Pixel Platformer: Food Expansion, CC0 1.0.
   - https://kenney.nl/assets/pixel-platformer-food-expansion
-- `lottery_source_coin_oga_cc0.png` 及其派生图：FacadeGaikan，经 OpenGameArt 的 CC0 Currency Icons 合集分发，CC0 1.0。
+- `lottery_source_coin_oga_cc0.png` and derivatives: FacadeGaikan, distributed in OpenGameArt's CC0 Currency Icons collection, CC0 1.0.
   - https://opengameart.org/content/cc0-currency-icons
-  - 原始来源：https://opengameart.org/node/29290
-- 红包、星章、数字、七扇区转盘与指针：为本固件制作的原创像素级改编，沿用上述 CC0 素材的紧凑调色板。
+  - Original source: https://opengameart.org/node/29290
+- Envelopes, star badges, numerals, the seven-sector wheel and pointer are original pixel adaptations for this firmware using the compact palette of the CC0 materials above.
 
-PNG 使用最近邻像素处理，并通过 LVGL 官方 `scripts/LVGLImage.py` 转为 `RGB565A8` C 数组。
+PNGs use nearest-neighbor processing and LVGL's official `scripts/LVGLImage.py` conversion to `RGB565A8` C arrays.

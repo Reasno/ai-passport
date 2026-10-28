@@ -4,6 +4,7 @@
 #include "bsp_audio.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "esp_random.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
@@ -122,7 +123,8 @@ static void evidence_task(void *arg)
         }
         int64_t now_ms = esp_timer_get_time() / 1000;
         char request_id[64];
-        snprintf(request_id, sizeof(request_id), "evi_%lld", (long long)now_ms);
+        snprintf(request_id, sizeof(request_id), "evi_%08lx_%08lx_%lld",
+                 (unsigned long)esp_random(), (unsigned long)esp_random(), (long long)now_ms);
         if (!mqtt_service_publish_evidence_start(request_id, task_id, EVIDENCE_MAX_DURATION_MS, EVIDENCE_CHUNK_BYTES)) {
             sound_service_audio_unlock();
             post_error("语音会话启动失败，请检查网络");

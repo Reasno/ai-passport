@@ -8,6 +8,8 @@
 #include "esp_netif.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
+#include "esp_sntp.h"
+#include <stdatomic.h>
 #include <string.h>
 
 #define RETRY_FAST_MS 2000
@@ -16,27 +18,32 @@ static const char *TAG = "kp_wifi";
 static bool s_started;
 static esp_timer_handle_t s_retry_timer;
 static int s_failures;
+static atomic_bool s_stopping;
 
 /* While no AP is reachable the STA keeps rescanning every channel, which drags ESP-NOW
  * along with it and breaks the offline "find sibling" ring. Between reconnect attempts we
  * pin the radio to a fixed channel and drop power save, so ESP-NOW has a stable window. */
 static void park_radio_for_espnow(void)
 {
+#if CONFIG_KIDS_ENABLE_GAMES
     esp_err_t chan = esp_wifi_set_channel(CONFIG_KP_ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);
     esp_err_t ps = esp_wifi_set_ps(WIFI_PS_NONE);
     ESP_LOGI(TAG, "offline mode: ESP-NOW channel pinned to %d (%s), power save off (%s)",
              CONFIG_KP_ESPNOW_CHANNEL, esp_err_to_name(chan), esp_err_to_name(ps));
+#endif
 }
 
 static void retry_connect(void *arg)
 {
     (void)arg;
+    if (atomic_load(&s_stopping)) return;
     esp_err_t err = esp_wifi_connect();
     if (err != ESP_OK) ESP_LOGW(TAG, "reconnect call failed: %s", esp_err_to_name(err));
 }
 
 static void schedule_retry(void)
 {
+    if (atomic_load(&s_stopping)) return;
     if (!s_retry_timer) { retry_connect(NULL); return; }
     bool fast = s_failures <= CONFIG_KP_WIFI_RETRY_FAST_TRIES;
     int64_t delay_ms = fast ? RETRY_FAST_MS : CONFIG_KP_WIFI_RETRY_SLOW_MS;
@@ -50,6 +57,7 @@ static void schedule_retry(void)
 static void wifi_event(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
     (void)arg;
+    if (atomic_load(&s_stopping)) return;
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
     } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
@@ -101,3 +109,15 @@ esp_err_t wifi_service_start(void)
     return err;
 }
 bool wifi_service_is_started(void) { return s_started; }
+
+esp_err_t wifi_service_stop(void)
+{
+    atomic_store(&s_stopping, true);
+    if (s_retry_timer) esp_timer_stop(s_retry_timer);
+    mqtt_service_stop();
+    esp_sntp_stop();
+    if (!s_started) return ESP_OK;
+    esp_err_t err = esp_wifi_stop();
+    if (err == ESP_OK) s_started = false;
+    return err;
+}

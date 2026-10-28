@@ -110,3 +110,9 @@ void sound_service_stop_ring(void)
 {
     s_stop_ring = true;
 }
+
+bool sound_service_prepare_sleep(void)
+{
+    s_stop_ring = true;
+    return !s_audio_lock || sound_service_audio_lock(pdMS_TO_TICKS(3000));
+}

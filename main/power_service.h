@@ -6,3 +6,6 @@ esp_err_t power_service_start(void);
 void power_service_wake(void);
 /* Returns true when this key only woke a dim/off display and must be consumed. */
 bool power_service_key_activity(void);
+/* UI worker only: no timer/button callback may perform terminal shutdown.
+ * busy defers sleep while recording, submitting, or showing a lottery result. */
+void power_service_poll(bool busy);
