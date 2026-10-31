@@ -44,6 +44,10 @@ run_static_checks() {
         tests/test_power_policy.c main/power_policy.c \
         -o "${test_dir}/test_power_policy"
     "${test_dir}/test_power_policy"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain/interaction \
+        tests/test_race_rules.c main/interaction/race_rules.c \
+        -o "${test_dir}/test_race_rules"
+    "${test_dir}/test_race_rules"
     "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Icomponents/bsp/src \
         tests/test_bsp_display_rounding.c components/bsp/src/bsp_display_rounding.c \
         -o "${test_dir}/test_bsp_display_rounding"
@@ -93,15 +97,6 @@ run_firmware_checks() (
 
     validation_build_dir="$(mktemp -d /tmp/ai-passport-firmware.XXXXXX)"
     trap 'case "${validation_build_dir}" in /tmp/ai-passport-firmware.*) rm -rf -- "${validation_build_dir}" ;; esac' EXIT
-
-    # Use the pinned firmware JSON library for protocol tests, without making
-    # the standalone static gate depend on an installed ESP-IDF checkout.
-    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
-        -I"${IDF_PATH}/components/json/cJSON" tests/test_ledger_store.c \
-        main/ledger_store.c main/notification_store.c \
-        "${IDF_PATH}/components/json/cJSON/cJSON.c" -lm \
-        -o "${validation_build_dir}/test_ledger_store"
-    "${validation_build_dir}/test_ledger_store"
 
     SDKCONFIG_DEFAULTS="${repo_root}/sdkconfig.defaults" \
         idf.py -B "${validation_build_dir}" \

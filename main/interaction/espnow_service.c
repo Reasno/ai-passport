@@ -4,6 +4,7 @@
 #include "game_service.h"
 #include "mole_game_service.h"
 #include "ptt_service.h"
+#include "race_game_service.h"
 #include "esp_crc.h"
 #include "esp_log.h"
 #include "esp_mac.h"
@@ -83,6 +84,8 @@ static void rx_task(void *arg)
             buzzer_game_service_on_packet(event.src, p);
         else if (mole_game_service_owns_packet(p->type))
             mole_game_service_on_packet(event.src, p);
+        else if (race_game_service_owns_packet(p->type))
+            race_game_service_on_packet(event.src, p);
         else
             game_service_on_packet(event.src, p, event.rssi);
     }

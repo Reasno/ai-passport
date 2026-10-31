@@ -10,8 +10,8 @@
 #include "nvs_cache.h"
 #include "notification_service.h"
 #include "power_service.h"
-#include "privacy_mode.h"
 #include "ptt_service.h"
+#include "race_game_service.h"
 #include "sound_service.h"
 #include "ui_common.h"
 #include "ui_confirm.h"
@@ -21,6 +21,7 @@
 #include "ui_lottery.h"
 #include "ui_notification.h"
 #include "lottery_assets.h"
+#include "ui_race.h"
 #include "ui_redeem.h"
 #include "ui_tasks.h"
 #include "ui_text.h"
@@ -32,7 +33,7 @@
 #include <stdio.h>
 #include <string.h>
 
-typedef enum { PAGE_HOME, PAGE_TASKS, PAGE_CONFIRM, PAGE_EVIDENCE, PAGE_REDEEM, PAGE_LOTTERY, PAGE_GAMES, PAGE_FIND, PAGE_RPS, PAGE_BUZZER, PAGE_MOLE } page_t;
+typedef enum { PAGE_HOME, PAGE_TASKS, PAGE_CONFIRM, PAGE_EVIDENCE, PAGE_REDEEM, PAGE_LOTTERY, PAGE_GAMES, PAGE_FIND, PAGE_RPS, PAGE_BUZZER, PAGE_MOLE, PAGE_RACE } page_t;
 static const char *TAG = "kp_ui";
 static page_t s_page = PAGE_HOME, s_confirm_return = PAGE_HOME;
 static int s_selected; static confirm_kind_t s_confirm_kind;
@@ -43,10 +44,11 @@ static bool s_message_then_tasks;
 static int s_lottery_rotation; static bool s_lottery_animating; static int64_t s_lottery_reveal_at;
 static bool s_suppress_wake_key;
 static bool s_mole_page_created;
+static bool s_race_page_created;
 static bool s_buzzer_press_consumed;
 static bool s_mole_b3_block_click;
 static int64_t s_b3_press_started;
-static bool s_b3_privacy_consumed;
+static bool s_b3_saver_consumed;
 #if CONFIG_ENABLE_SCREENSHOT
 typedef enum { DEBUG_LOTTERY_IDLE, DEBUG_LOTTERY_SPIN, DEBUG_LOTTERY_RESULT } debug_lottery_t;
 typedef enum { DEBUG_BUZZER_NONE, DEBUG_BUZZER_ARMED, DEBUG_BUZZER_GO, DEBUG_BUZZER_RESULT } debug_buzzer_t;
@@ -68,12 +70,14 @@ static app_model_snapshot_t s_ui_model;
 static game_snapshot_t s_game;
 static buzzer_game_snapshot_t s_buzzer;
 static mole_game_snapshot_t s_mole;
+static race_game_snapshot_t s_race;
 static evidence_service_snapshot_t s_evidence;
 
 static app_model_snapshot_t *model_snapshot(void) { app_model_snapshot(&s_ui_model); return &s_ui_model; }
 static game_snapshot_t *game_snapshot(void) { game_service_snapshot(&s_game); return &s_game; }
 static buzzer_game_snapshot_t *buzzer_snapshot(void) { buzzer_game_service_snapshot(&s_buzzer); return &s_buzzer; }
 static mole_game_snapshot_t *mole_snapshot(void) { mole_game_service_snapshot(&s_mole); return &s_mole; }
+static race_game_snapshot_t *race_snapshot(void) { race_game_service_snapshot(&s_race); return &s_race; }
 static evidence_service_snapshot_t *evidence_snapshot(void) { evidence_service_snapshot(&s_evidence); return &s_evidence; }
 static void set_message(const char *text, bool error)
 {
@@ -137,6 +141,14 @@ static void render(void)
         }
         return;
     }
+    if (s_page == PAGE_RACE && s_race_page_created) {
+        race_game_snapshot_t *race = race_snapshot();
+        if (bsp_lvgl_lock(100)) {
+            ui_race_update(race);
+            bsp_lvgl_unlock();
+        }
+        return;
+    }
     if (!bsp_lvgl_lock(1000)) return;
     lv_obj_t *screen = NULL;
     if (s_page == PAGE_HOME) screen = ui_home_build(model, s_selected);
@@ -155,7 +167,10 @@ static void render(void)
     else if (s_page == PAGE_FIND) screen = ui_find_build(model, game, s_find_status, s_find_waiting);
     else if (s_page == PAGE_RPS) screen = ui_rps_build(model, game);
     else if (s_page == PAGE_BUZZER) screen = ui_buzzer_build(model, buzzer);
-    else {
+    else if (s_page == PAGE_RACE) {
+        screen = ui_race_build(model, race_snapshot());
+        s_race_page_created = true;
+    } else {
         screen = ui_mole_build(model, mole);
         s_mole_page_created = true;
     }
@@ -283,6 +298,11 @@ static void go(page_t page, int selected)
         s_mole_page_created = false;
     }
     if (s_page != PAGE_MOLE && page == PAGE_MOLE) s_mole_page_created = false;
+    if (s_page == PAGE_RACE && page != PAGE_RACE) {
+        ui_race_forget();
+        s_race_page_created = false;
+    }
+    if (s_page != PAGE_RACE && page == PAGE_RACE) s_race_page_created = false;
     s_page = page; s_selected = selected; ESP_LOGI(TAG, "页面=%d 选中=%d", page, selected); render();
 }
 static void key_move(int delta, int count)
@@ -308,7 +328,7 @@ static void handle_short_key(bsp_btn_t key)
     app_model_snapshot_t *model = model_snapshot(); game_snapshot_t *game = game_snapshot();
     buzzer_game_snapshot_t *buzzer = buzzer_snapshot();
     mole_game_snapshot_t *mole = mole_snapshot();
-    if (model->pending_type != APP_PENDING_NONE && s_page != PAGE_LOTTERY && s_page != PAGE_GAMES && s_page != PAGE_FIND && s_page != PAGE_RPS && s_page != PAGE_BUZZER && s_page != PAGE_MOLE) return;
+    if (model->pending_type != APP_PENDING_NONE && s_page != PAGE_LOTTERY && s_page != PAGE_GAMES && s_page != PAGE_FIND && s_page != PAGE_RPS && s_page != PAGE_BUZZER && s_page != PAGE_MOLE && s_page != PAGE_RACE) return;
     int delta = key == BSP_BTN_UP ? -1 : 1;
     if (s_page == PAGE_HOME) {
         if (key != BSP_BTN_OK) key_move(delta, 3);
@@ -341,7 +361,7 @@ static void handle_short_key(bsp_btn_t key)
             else { set_message("无法提交\n请检查网络后重试", true); sound_service_play(SOUND_DU); render(); } }
     } else if (s_page == PAGE_LOTTERY && model->lottery_ready && !s_lottery_animating && key == BSP_BTN_OK) go(PAGE_REDEEM, 1);
     else if (s_page == PAGE_GAMES) {
-        if (key != BSP_BTN_OK) key_move(delta, 4);
+        if (key != BSP_BTN_OK) key_move(delta, UI_GAMES_COUNT);
         /* Find only needs one live transport; both competitive games require pairing. */
         else if (s_selected == 0) {
             if (!game->paired && !model->mqtt_online) { set_message("请长按B3先配对", false); render(); }
@@ -351,9 +371,12 @@ static void handle_short_key(bsp_btn_t key)
         else if (!game_service_heap_allows_rps()) { set_message("内存不足，对战不可用", true); render(); }
         else if (s_selected == 1) { game_service_invite_rps(); go(PAGE_RPS, 0); }
         else if (s_selected == 2) { buzzer_game_service_invite(); go(PAGE_BUZZER, 0); }
-        else {
+        else if (s_selected == 3) {
             mole_game_service_begin_session();
             go(PAGE_MOLE, 0);
+        } else {
+            race_game_service_invite();
+            go(PAGE_RACE, 0);
         }
     } else if (s_page == PAGE_FIND && key == BSP_BTN_OK) {
         /* Both transports fire together: MQTT when online (so HA sees it) plus an
@@ -406,6 +429,14 @@ static void handle_short_key(bsp_btn_t key)
                    key == BSP_BTN_OK) {
             mole_game_service_begin_session();
         }
+    } else if (s_page == PAGE_RACE) {
+        race_game_snapshot_t *race = race_snapshot();
+        if (race->phase == RACE_PHASE_INVITE_RECEIVED) {
+            if (key == BSP_BTN_OK) race_game_service_respond_invite(true);
+            else if (key == BSP_BTN_DOWN) { race_game_service_respond_invite(false); go(PAGE_GAMES, 4); }
+        } else if ((race->phase == RACE_PHASE_IDLE || race->phase == RACE_PHASE_RESULT) && key == BSP_BTN_OK) {
+            race_game_service_invite();
+        }
     }
 }
 #if CONFIG_ENABLE_SCREENSHOT
@@ -450,21 +481,19 @@ static void process_event(const app_event_t *event)
         bool b3_pair_on_release = false;
         if (event->button == BSP_BTN_OK && event->button_event == BSP_BTN_PRESS) {
             s_b3_press_started = event->timestamp_ms;
-            s_b3_privacy_consumed = false;
+            s_b3_saver_consumed = false;
             if (s_page == PAGE_MOLE) s_mole_b3_block_click = false;
         } else if (event->button == BSP_BTN_OK && event->button_event == BSP_BTN_HOLD_5S && s_page == PAGE_HOME) {
-            privacy_mode_toggle();
-            s_b3_privacy_consumed = true;
-            if (s_page == PAGE_MOLE) s_mole_b3_block_click = true;
-            set_message(privacy_mode_is_active() ? "隐私模式已开启" : "隐私模式已关闭", false);
+            s_b3_saver_consumed = true;
+            set_message(power_service_toggle_saver() ? "省电模式已开启" : "省电模式已关闭", false);
             sound_service_play(SOUND_DING);
             render();
             return;
         } else if (event->button == BSP_BTN_OK && event->button_event == BSP_BTN_RELEASE) {
-            b3_pair_on_release = s_b3_press_started > 0 && !s_b3_privacy_consumed &&
+            b3_pair_on_release = s_b3_press_started > 0 && !s_b3_saver_consumed &&
                                  event->timestamp_ms - s_b3_press_started >= 1000;
             s_b3_press_started = 0;
-            s_b3_privacy_consumed = false;
+            s_b3_saver_consumed = false;
         }
         if (s_find_ringing) {
             sound_service_stop_ring();
@@ -514,6 +543,17 @@ static void process_event(const app_event_t *event)
             s_buzzer_press_consumed = false;
             return;
         }
+        /* Racing steers on PRESS for the lowest latency and drops the CLICK that follows. */
+        if (s_page == PAGE_RACE && race_snapshot()->phase == RACE_PHASE_RACING) {
+            if (event->button_event == BSP_BTN_PRESS) {
+                if (event->button == BSP_BTN_UP) race_game_service_steer(-1);
+                else if (event->button == BSP_BTN_DOWN) race_game_service_steer(1);
+                else race_game_service_request_drs();
+                render();
+                return;
+            }
+            if (event->button_event == BSP_BTN_CLICK || event->button_event == BSP_BTN_DOUBLE) return;
+        }
         if (event->button_event == BSP_BTN_LONG && event->button == BSP_BTN_DOWN && s_page == PAGE_FIND) {
             if (ptt_service_available()) ptt_service_set_transmitting(true);
             else set_message("对讲不可用\n需配对和70KB内存", true);
@@ -525,7 +565,7 @@ static void process_event(const app_event_t *event)
             render(); return;
         }
         /* The 1-second B3 long event is deferred until release so a 5-second hold can
-         * toggle privacy without also starting pairing. */
+         * toggle power-saving mode without also starting pairing. */
         if (event->button_event == BSP_BTN_LONG && event->button == BSP_BTN_OK) return;
         if (s_page == PAGE_MOLE && event->button == BSP_BTN_OK &&
             event->button_event == BSP_BTN_CLICK && s_mole_b3_block_click) {
@@ -543,6 +583,7 @@ static void process_event(const app_event_t *event)
                 game_service_cancel();
                 buzzer_game_service_cancel();
                 mole_game_service_cancel();
+                race_game_service_cancel();
                 go(PAGE_HOME, 0);
             }
             return;
@@ -607,7 +648,15 @@ static void process_event(const app_event_t *event)
         game_snapshot_t *game = game_snapshot();
         buzzer_game_snapshot_t *buzzer = buzzer_snapshot();
         mole_game_snapshot_t *mole = mole_snapshot();
-        if (mole->phase == MOLE_PHASE_INVITE_RECEIVED) {
+        race_game_snapshot_t *race = race_snapshot();
+        if (race->phase == RACE_PHASE_INVITE_RECEIVED && s_page != PAGE_RACE) {
+            power_service_wake();
+            sound_service_play(SOUND_DING);
+            go(PAGE_RACE, 0);
+        } else if (race->phase == RACE_PHASE_COUNTDOWN && s_page != PAGE_RACE) {
+            power_service_wake();
+            go(PAGE_RACE, 0);
+        } else if (mole->phase == MOLE_PHASE_INVITE_RECEIVED) {
             power_service_wake();
             sound_service_play(SOUND_DING);
             go(PAGE_MOLE, 0);
@@ -636,7 +685,7 @@ static void process_event(const app_event_t *event)
         if (ptt_service_is_transmitting()) ptt_service_set_transmitting(false);
         if (s_page == PAGE_EVIDENCE && evidence_snapshot()->active) evidence_service_stop();
         s_b3_press_started = 0;
-        s_b3_privacy_consumed = false;
+        s_b3_saver_consumed = false;
         refresh_notification_overlay();
         if (s_notification_visible) {
             power_service_wake();
@@ -651,13 +700,31 @@ static void process_event(const app_event_t *event)
         sound_service_play(SOUND_DU); render();
     } else render();
 }
+/* Live rounds, recording, requests and ringing defer power-saving deep sleep.
+ * Result screens and passive Find radar wait for the user and may sleep. */
+static bool ui_busy(void)
+{
+    game_snapshot_t *game = game_snapshot();
+    buzzer_game_snapshot_t *buzzer = buzzer_snapshot();
+    mole_game_snapshot_t *mole = mole_snapshot();
+    race_game_snapshot_t *race = race_snapshot();
+    return s_ui_model.pending_type != APP_PENDING_NONE || evidence_snapshot()->active ||
+           s_lottery_animating || s_find_waiting || s_find_ringing || ptt_service_is_transmitting() ||
+           (game->state != GAME_STATE_IDLE && game->state != GAME_STATE_RESULT) ||
+           (buzzer->state != BUZZER_STATE_IDLE && buzzer->state != BUZZER_STATE_RESULT) ||
+           (mole->phase != MOLE_PHASE_IDLE && mole->phase != MOLE_PHASE_RESULT) ||
+           (race->phase != RACE_PHASE_IDLE && race->phase != RACE_PHASE_RESULT);
+}
 static void ui_task(void *arg)
 {
     (void)arg; ui_app_init(); render(); ESP_LOGI(TAG, "UI启动 stack high-water=%u", (unsigned)uxTaskGetStackHighWaterMark(NULL));
     app_event_t event; int64_t next_game_tick = 0;
     uint32_t last_evidence_second = UINT32_MAX;
     for (;;) {
-        if (xQueueReceive(app_events_queue(), &event, pdMS_TO_TICKS(100)) == pdTRUE) {
+        /* A live race scrolls the track every game tick; other pages wake on events. */
+        TickType_t wait = s_page == PAGE_RACE && s_race.phase == RACE_PHASE_RACING ? pdMS_TO_TICKS(40)
+                                                                                     : pdMS_TO_TICKS(100);
+        if (xQueueReceive(app_events_queue(), &event, wait) == pdTRUE) {
             process_event(&event);
         }
         int64_t now = esp_timer_get_time() / 1000;
@@ -677,17 +744,26 @@ static void ui_task(void *arg)
                 game_service_tick(now);
                 buzzer_game_service_tick(now);
                 mole_game_service_tick(now);
+                race_game_service_tick(now);
             }
 #else
             game_service_tick(now);
             buzzer_game_service_tick(now);
             mole_game_service_tick(now);
+            race_game_service_tick(now);
 #endif
             next_game_tick = now + 50;
             if (s_page == PAGE_MOLE && s_mole_page_created) {
                 mole_game_snapshot_t *mole = mole_snapshot();
                 if (bsp_lvgl_lock(100)) {
                     ui_mole_update(mole);
+                    bsp_lvgl_unlock();
+                }
+            }
+            if (s_page == PAGE_RACE && s_race_page_created) {
+                race_game_snapshot_t *race = race_snapshot();
+                if (bsp_lvgl_lock(100)) {
+                    ui_race_update(race);
                     bsp_lvgl_unlock();
                 }
             }
@@ -744,6 +820,7 @@ static void ui_task(void *arg)
                 go(PAGE_TASKS, 0);
             } else render();
         }
+        power_service_poll(ui_busy());
     }
 }
 esp_err_t ui_app_start(void) { return xTaskCreatePinnedToCore(ui_task, "kp_ui", 8192, NULL, 3, NULL, 0) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM; }

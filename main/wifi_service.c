@@ -25,12 +25,10 @@ static atomic_bool s_stopping;
  * pin the radio to a fixed channel and drop power save, so ESP-NOW has a stable window. */
 static void park_radio_for_espnow(void)
 {
-#if CONFIG_KIDS_ENABLE_GAMES
     esp_err_t chan = esp_wifi_set_channel(CONFIG_KP_ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);
     esp_err_t ps = esp_wifi_set_ps(WIFI_PS_NONE);
     ESP_LOGI(TAG, "offline mode: ESP-NOW channel pinned to %d (%s), power save off (%s)",
              CONFIG_KP_ESPNOW_CHANNEL, esp_err_to_name(chan), esp_err_to_name(ps));
-#endif
 }
 
 static void retry_connect(void *arg)

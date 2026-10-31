@@ -1,12 +1,5 @@
 menu "Kids Points 固件"
 
-config KIDS_ENABLE_GAMES
-    bool "Build interactive games and ESP-NOW services"
-    default n
-    help
-        Enables the retained game pages, assets and connected standby mode.
-        Disabled builds use the points ledger and terminal deep sleep.
-
 config WIFI_SSID
     string "Wi-Fi SSID"
     default "YOUR_WIFI_SSID_HERE"

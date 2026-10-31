@@ -1,5 +1,6 @@
 #include "ui_common.h"
 #include "battery_service.h"
+#include "power_service.h"
 #include "time_service.h"
 #include "ui_fonts.h"
 #include "ui_pixel_icons.h"
@@ -9,6 +10,7 @@
 #include <time.h>
 
 static lv_obj_t *s_wifi_icon;
+static lv_obj_t *s_battery_icon;
 static lv_obj_t *s_battery_text;
 static lv_obj_t *s_time_text;
 static lv_timer_t *s_status_timer;
@@ -70,6 +72,10 @@ void ui_statusbar_update(const app_model_snapshot_t *model)
     if (!model) { app_model_snapshot(&snapshot); model = &snapshot; }
 
     lv_obj_set_style_image_recolor(s_wifi_icon, lv_color_hex(model->wifi_online ? KP_GREEN : KP_MUTED), 0);
+    /* A yellow battery marks power-saving mode on every page. */
+    if (s_battery_icon)
+        lv_obj_set_style_image_recolor(s_battery_icon,
+                                       lv_color_hex(power_service_saver_enabled() ? KP_YELLOW : KP_MUTED_LIGHT), 0);
 
     battery_snapshot_t battery = {0};
     battery_service_snapshot(&battery);
@@ -101,7 +107,7 @@ lv_obj_t *ui_statusbar_create(lv_obj_t *parent, const app_model_snapshot_t *mode
 
     /* Keep battery compact: icon immediately followed by the percent label. */
     s_wifi_icon = ui_pixel_icon_create(bar, UI_PIXEL_ICON_WIFI, 166, 4, KP_MUTED, 1);
-    ui_pixel_icon_create(bar, UI_PIXEL_ICON_BATTERY, 184, 4, KP_MUTED_LIGHT, 1);
+    s_battery_icon = ui_pixel_icon_create(bar, UI_PIXEL_ICON_BATTERY, 184, 4, KP_MUTED_LIGHT, 1);
     s_battery_text = ui_common_label_small(bar, "--%", 196, 1, 42, LV_TEXT_ALIGN_RIGHT);
 
     if (!s_status_timer) {

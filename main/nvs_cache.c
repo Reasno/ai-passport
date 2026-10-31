@@ -18,6 +18,9 @@
 #define KEY_BUZZER_LOSSES "buz_loss_u32"
 #define KEY_MOLE_WINS "mole_win_u32"
 #define KEY_MOLE_LOSSES "mole_loss_u32"
+#define KEY_RACE_WINS "race_win_u32"
+#define KEY_RACE_LOSSES "race_loss_u32"
+#define KEY_POWER_SAVER "pwr_saver_u8"
 static const char *TAG = "kp_cache";
 /* NVS serialization runs in the UI task; avoid a ~2 KB automatic object there. */
 static app_model_snapshot_t s_cache_model;
@@ -101,6 +104,25 @@ static esp_err_t save_game_stats(const char *wins_key, const char *losses_key,
     return err;
 }
 
+static esp_err_t load_pair_stats(const char *wins_key, const char *losses_key,
+                                 uint32_t *wins, uint32_t *losses)
+{
+    if (!wins || !losses) return ESP_ERR_INVALID_ARG;
+    *wins = *losses = 0;
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(NS, NVS_READONLY, &h);
+    if (err == ESP_ERR_NVS_NOT_FOUND) return ESP_OK;
+    if (err != ESP_OK) return err;
+    err = nvs_get_u32(h, wins_key, wins);
+    if (err == ESP_ERR_NVS_NOT_FOUND) { *wins = 0; err = ESP_OK; }
+    if (err == ESP_OK) {
+        err = nvs_get_u32(h, losses_key, losses);
+        if (err == ESP_ERR_NVS_NOT_FOUND) { *losses = 0; err = ESP_OK; }
+    }
+    nvs_close(h);
+    return err;
+}
+
 esp_err_t nvs_cache_save_rps_stats(uint32_t wins, uint32_t losses)
 {
     return save_game_stats(KEY_RPS_WINS, KEY_RPS_LOSSES, wins, losses);
@@ -113,25 +135,50 @@ esp_err_t nvs_cache_save_buzzer_stats(uint32_t wins, uint32_t losses)
 
 esp_err_t nvs_cache_load_mole_stats(uint32_t *wins, uint32_t *losses)
 {
-    if (!wins || !losses) return ESP_ERR_INVALID_ARG;
-    *wins = *losses = 0;
-    nvs_handle_t h;
-    esp_err_t err = nvs_open(NS, NVS_READONLY, &h);
-    if (err == ESP_ERR_NVS_NOT_FOUND) return ESP_OK;
-    if (err != ESP_OK) return err;
-    err = nvs_get_u32(h, KEY_MOLE_WINS, wins);
-    if (err == ESP_ERR_NVS_NOT_FOUND) { *wins = 0; err = ESP_OK; }
-    if (err == ESP_OK) {
-        err = nvs_get_u32(h, KEY_MOLE_LOSSES, losses);
-        if (err == ESP_ERR_NVS_NOT_FOUND) { *losses = 0; err = ESP_OK; }
-    }
-    nvs_close(h);
-    return err;
+    return load_pair_stats(KEY_MOLE_WINS, KEY_MOLE_LOSSES, wins, losses);
 }
 
 esp_err_t nvs_cache_save_mole_stats(uint32_t wins, uint32_t losses)
 {
     return save_game_stats(KEY_MOLE_WINS, KEY_MOLE_LOSSES, wins, losses);
+}
+
+esp_err_t nvs_cache_load_race_stats(uint32_t *wins, uint32_t *losses)
+{
+    return load_pair_stats(KEY_RACE_WINS, KEY_RACE_LOSSES, wins, losses);
+}
+
+esp_err_t nvs_cache_save_race_stats(uint32_t wins, uint32_t losses)
+{
+    return save_game_stats(KEY_RACE_WINS, KEY_RACE_LOSSES, wins, losses);
+}
+
+esp_err_t nvs_cache_load_power_saver(bool *enabled)
+{
+    if (!enabled) return ESP_ERR_INVALID_ARG;
+    *enabled = false;
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(NS, NVS_READONLY, &h);
+    if (err == ESP_ERR_NVS_NOT_FOUND) return ESP_OK;
+    if (err != ESP_OK) return err;
+    uint8_t value = 0;
+    err = nvs_get_u8(h, KEY_POWER_SAVER, &value);
+    if (err == ESP_ERR_NVS_NOT_FOUND) err = ESP_OK;
+    nvs_close(h);
+    *enabled = err == ESP_OK && value != 0;
+    return err;
+}
+
+esp_err_t nvs_cache_save_power_saver(bool enabled)
+{
+    nvs_handle_t h;
+    esp_err_t err = open_write(&h);
+    if (err != ESP_OK) return err;
+    err = nvs_set_u8(h, KEY_POWER_SAVER, enabled ? 1 : 0);
+    if (err == ESP_OK) err = nvs_commit(h);
+    nvs_close(h);
+    ESP_LOGI(TAG, "写省电模式=%d: %s", enabled, esp_err_to_name(err));
+    return err;
 }
 
 esp_err_t nvs_cache_save_model(void)

@@ -6,7 +6,6 @@
 esp_err_t mqtt_service_start(void);
 void mqtt_service_on_ip_ready(void);
 void mqtt_service_stop(void);
-bool mqtt_service_publish_ledger(const char *request_id, uint64_t before_id);
 bool mqtt_service_publish_complete_task(const char *task_id);
 bool mqtt_service_publish_redeem(const char *reward_id);
 bool mqtt_service_publish_evidence_start(const char *request_id, const char *task_id, uint32_t max_duration_ms, size_t chunk_bytes);

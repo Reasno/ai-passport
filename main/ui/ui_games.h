@@ -6,6 +6,9 @@
 #include "lvgl.h"
 #include <stdbool.h>
 
+/* Find, RPS, buzzer, Whac-A-Mole and racing; the list shows four cards at a time. */
+#define UI_GAMES_COUNT 5
+
 lv_obj_t *ui_games_build(const app_model_snapshot_t *model, const game_snapshot_t *game, int selected);
 lv_obj_t *ui_find_build(const app_model_snapshot_t *model, const game_snapshot_t *game,
                         const char *find_status, bool waiting);

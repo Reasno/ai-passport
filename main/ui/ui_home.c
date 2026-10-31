@@ -3,7 +3,7 @@
 #include "ui_common.h"
 #include "ui_fonts.h"
 #include "logo_assets.h"
-#include "privacy_mode.h"
+#include "sdkconfig.h"
 #include "ui_pixel_icons.h"
 #include <stdio.h>
 
@@ -58,7 +58,7 @@ lv_obj_t *ui_home_build(const app_model_snapshot_t *model, int selected)
     lv_obj_t *avatar = ui_avatar_create(screen, 106, 1);
     /* Text header: the child's name in the large Chinese font, left column only so
      * that it never runs under the avatar or the status bar. */
-    lv_obj_t *name = ui_common_label(screen, privacy_mode_display_name(), 6, 62, 96, LV_TEXT_ALIGN_CENTER, true);
+    lv_obj_t *name = ui_common_label(screen, CONFIG_KP_CHILD_NAME, 6, 62, 96, LV_TEXT_ALIGN_CENTER, true);
     lv_obj_set_style_text_color(name, lv_color_hex(KP_THEME), 0);
     lv_obj_set_height(name, 32);
     lv_obj_t *role_badge = pill(screen, 21, 120, 62, 24, 0x172B35);
@@ -74,11 +74,7 @@ lv_obj_t *ui_home_build(const app_model_snapshot_t *model, int selected)
     pill_label(progress, pv, UI_FONT_SMALL, KP_GREEN, 11);
     entry(screen, 8, selected == 0, UI_PIXEL_ICON_TASK, "今日任务");
     entry(screen, 85, selected == 1, UI_PIXEL_ICON_GIFT, "兑换奖品");
-#if CONFIG_KIDS_ENABLE_GAMES
     entry(screen, 162, selected == 2, UI_PIXEL_ICON_GAME, "互动游戏");
-#else
-    entry(screen, 162, selected == 2, UI_PIXEL_ICON_CHECK, "积分流水");
-#endif
     ui_common_footer(screen, "B1 B2选择  B3确认  长按B1主页", model->pending_type != APP_PENDING_NONE);
     lv_obj_t *statusbar = ui_statusbar_create(screen, model, true);
     lv_obj_move_foreground(avatar);

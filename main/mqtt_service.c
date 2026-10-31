@@ -7,7 +7,6 @@
 #include "esp_random.h"
 #include "find_service.h"
 #include "notification_service.h"
-#include "ledger_service.h"
 #include "mbedtls/sha256.h"
 #include "mbedtls/base64.h"
 #include "mqtt_client.h"
@@ -98,9 +97,11 @@ static bool valid_content_key(const char *key)
     }
     return true;
 }
-static void make_item_topic(char *out, size_t size, const char *prefix, const char *key)
+/* Returns false when prefix + key does not fit, so callers never act on a truncated topic. */
+static bool make_item_topic(char *out, size_t size, const char *prefix, const char *key)
 {
-    snprintf(out, size, "%s%s", prefix, key);
+    int len = snprintf(out, size, "%s%s", prefix, key);
+    return len > 0 && (size_t)len < size;
 }
 static bool key_in_list(const char *key, char keys[][CONTENT_KEY_LEN], size_t count)
 {
@@ -178,8 +179,8 @@ static bool parse_manifest(cJSON *root, bool tasks)
     char topic[128];
     if (tasks) {
         for (size_t i = 0; i < APP_MAX_TASKS && s_task_slots[i].key[0]; i++) {
-            if (!key_in_list(s_task_slots[i].key, s_manifest_keys, count)) {
-                make_item_topic(topic, sizeof(topic), prefix, s_task_slots[i].key);
+            if (!key_in_list(s_task_slots[i].key, s_manifest_keys, count) &&
+                make_item_topic(topic, sizeof(topic), prefix, s_task_slots[i].key)) {
                 esp_mqtt_client_unsubscribe(s_client, topic);
             }
         }
@@ -188,8 +189,8 @@ static bool parse_manifest(cJSON *root, bool tasks)
         s_tasks_mode = PROTOCOL_V3;
     } else {
         for (size_t i = 0; i < APP_MAX_REWARDS && s_reward_slots[i].key[0]; i++) {
-            if (!key_in_list(s_reward_slots[i].key, s_manifest_keys, count)) {
-                make_item_topic(topic, sizeof(topic), prefix, s_reward_slots[i].key);
+            if (!key_in_list(s_reward_slots[i].key, s_manifest_keys, count) &&
+                make_item_topic(topic, sizeof(topic), prefix, s_reward_slots[i].key)) {
                 esp_mqtt_client_unsubscribe(s_client, topic);
             }
         }
@@ -198,8 +199,7 @@ static bool parse_manifest(cJSON *root, bool tasks)
         s_rewards_mode = PROTOCOL_V3;
     }
     for (size_t i = 0; i < count; i++) {
-        make_item_topic(topic, sizeof(topic), prefix, s_manifest_keys[i]);
-        esp_mqtt_client_subscribe(s_client, topic, 1);
+        if (make_item_topic(topic, sizeof(topic), prefix, s_manifest_keys[i])) esp_mqtt_client_subscribe(s_client, topic, 1);
     }
     if (active_count > APP_MAX_TASKS) ESP_LOGW(TAG, "%s manifest active=%u，设备最多加载%u项", tasks ? "tasks" : "rewards", (unsigned)active_count, APP_MAX_TASKS);
     ESP_LOGI(TAG, "%s manifest count=%u selected=%u protocol=%s", tasks ? "tasks" : "rewards", (unsigned)active_count, (unsigned)count, mode_name(PROTOCOL_V3));
@@ -362,7 +362,6 @@ static void handle_lottery(void)
 
 static void handle_payload(void)
 {
-#if CONFIG_KIDS_ENABLE_GAMES
     if (topic_is(s_find_ring_topic) || topic_is(s_find_ack_topic)) {
         cJSON *root = cJSON_ParseWithLength(s_rx_data, s_rx_total);
         if (!root) { ESP_LOGW(TAG, "Find payload invalid JSON"); return; }
@@ -375,11 +374,6 @@ static void handle_payload(void)
             find_service_on_mqtt(topic_is(s_find_ring_topic), sender, ts);
         }
         cJSON_Delete(root);
-        return;
-    }
-#endif
-    if (topic_is("kids_points/ledger/" CONFIG_ACTOR_CHILD_ID "/response")) {
-        ledger_service_receive(s_rx_data, s_rx_total);
         return;
     }
     if (strncmp(s_rx_topic, TOPIC_RESULT_PREFIX, strlen(TOPIC_RESULT_PREFIX)) == 0 || topic_is(TOPIC_ACTION_ERROR)) {
@@ -436,12 +430,10 @@ static void subscribe_known_items(void)
 {
     char topic[128];
     for (size_t i = 0; i < APP_MAX_TASKS && s_task_slots[i].key[0]; i++) {
-        make_item_topic(topic, sizeof(topic), s_tasks_items_prefix, s_task_slots[i].key);
-        esp_mqtt_client_subscribe(s_client, topic, 1);
+        if (make_item_topic(topic, sizeof(topic), s_tasks_items_prefix, s_task_slots[i].key)) esp_mqtt_client_subscribe(s_client, topic, 1);
     }
     for (size_t i = 0; i < APP_MAX_REWARDS && s_reward_slots[i].key[0]; i++) {
-        make_item_topic(topic, sizeof(topic), s_rewards_items_prefix, s_reward_slots[i].key);
-        esp_mqtt_client_subscribe(s_client, topic, 1);
+        if (make_item_topic(topic, sizeof(topic), s_rewards_items_prefix, s_reward_slots[i].key)) esp_mqtt_client_subscribe(s_client, topic, 1);
     }
 }
 static void subscribe_all_roots(esp_mqtt_client_handle_t client)
@@ -452,11 +444,8 @@ static void subscribe_all_roots(esp_mqtt_client_handle_t client)
     esp_mqtt_client_subscribe(client, TOPIC_RESULT, 1);
     esp_mqtt_client_subscribe(client, TOPIC_ACTION_ERROR, 1);
     esp_mqtt_client_subscribe(client, s_lottery_child_topic, 1);
-#if CONFIG_KIDS_ENABLE_GAMES
     esp_mqtt_client_subscribe(client, s_find_ring_topic, 1);
     esp_mqtt_client_subscribe(client, s_find_ack_topic, 1);
-#endif
-    esp_mqtt_client_subscribe(client, "kids_points/ledger/" CONFIG_ACTOR_CHILD_ID "/response", 1);
     esp_mqtt_client_subscribe(client, s_notifications_topic, 1);
     subscribe_known_items();
 }
@@ -576,16 +565,6 @@ static bool publish_json_topic(const char *topic, const char *payload)
     if (!s_client || !s_mqtt_publish_model.mqtt_online || !topic || !payload) return false;
     int msg_id = esp_mqtt_client_publish(s_client, topic, payload, 0, 1, false);
     return msg_id >= 0;
-}
-
-bool mqtt_service_publish_ledger(const char *request_id, uint64_t before_id)
-{
-    char payload[160];
-    int len = snprintf(payload, sizeof(payload),
-        "{\"request_id\":\"%s\",\"before_id\":%llu,\"limit\":2}",
-        request_id, (unsigned long long)before_id);
-    return len > 0 && len < sizeof(payload) &&
-        publish_json_topic("kids_points/ledger/" CONFIG_ACTOR_CHILD_ID "/request", payload);
 }
 
 bool mqtt_service_publish_evidence_start(const char *request_id, const char *task_id, uint32_t max_duration_ms, size_t chunk_bytes)

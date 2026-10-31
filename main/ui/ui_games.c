@@ -64,6 +64,42 @@ static void rps_choice_card(lv_obj_t *screen, int x, const lv_image_dsc_t *image
     lv_obj_set_style_text_color(caption, lv_color_hex(selected ? KP_TEXT : KP_MUTED_LIGHT), 0);
 }
 
+static lv_obj_t *icon_block(lv_obj_t *parent, int x, int y, int w, int h, uint32_t color)
+{
+    lv_obj_t *obj = lv_obj_create(parent);
+    lv_obj_set_pos(obj, x, y);
+    lv_obj_set_size(obj, w, h);
+    lv_obj_set_style_pad_all(obj, 0, 0);
+    lv_obj_set_style_border_width(obj, 0, 0);
+    lv_obj_set_style_radius(obj, 0, 0);
+    lv_obj_set_style_bg_color(obj, lv_color_hex(color), 0);
+    lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, 0);
+    lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+    return obj;
+}
+
+/* Top-down race car in the same block style as the in-game car. */
+static lv_obj_t *race_icon_create(lv_obj_t *parent, bool enabled)
+{
+    lv_obj_t *icon = lv_obj_create(parent);
+    lv_obj_set_size(icon, 40, 40);
+    lv_obj_set_style_bg_opa(icon, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(icon, 0, 0);
+    lv_obj_set_style_pad_all(icon, 0, 0);
+    lv_obj_remove_flag(icon, LV_OBJ_FLAG_SCROLLABLE);
+    uint32_t body = enabled ? KP_THEME : KP_MUTED;
+    icon_block(icon, 9, 2, 22, 4, body);
+    icon_block(icon, 15, 6, 10, 30, body);
+    icon_block(icon, 11, 16, 18, 10, body);
+    icon_block(icon, 8, 34, 24, 4, body);
+    icon_block(icon, 18, 11, 4, 5, 0xD6E8FF);
+    icon_block(icon, 5, 7, 5, 9, 0x0A0F18);
+    icon_block(icon, 30, 7, 5, 9, 0x0A0F18);
+    icon_block(icon, 5, 24, 5, 9, 0x0A0F18);
+    icon_block(icon, 30, 24, 5, 9, 0x0A0F18);
+    return icon;
+}
+
 static void game_card(lv_obj_t *screen, int y, bool selected, bool enabled, ui_pixel_icon_t icon,
                       const lv_image_dsc_t *art, const char *title, const char *detail)
 {
@@ -79,6 +115,8 @@ static void game_card(lv_obj_t *screen, int y, bool selected, bool enabled, ui_p
                     ? ui_radar_icon_create(card, 0, 0, enabled ? KP_THEME : KP_MUTED, 3)
                 : icon == UI_PIXEL_ICON_BUZZER
                     ? ui_buzzer_icon_create(card, 0, 0, enabled, 3)
+                : icon == UI_PIXEL_ICON_RACE
+                    ? race_icon_create(card, enabled)
                     : ui_pixel_icon_create(card, icon, 0, 0, enabled ? KP_THEME : KP_MUTED, 3);
     }
     if (image) {
@@ -101,15 +139,30 @@ lv_obj_t *ui_games_build(const app_model_snapshot_t *model, const game_snapshot_
     bool find_ready = game->paired || model->mqtt_online;
     const char *find_detail = game->paired ? "响铃和近距离信号"
                               : model->mqtt_online ? "仅WiFi响铃 无测距" : "请先完成配对";
-    game_card(screen, 39, selected == 0, game_service_heap_allows_radar() && find_ready,
-              UI_PIXEL_ICON_RADAR, NULL, "找" KP_PEER_LABEL, find_detail);
-    game_card(screen, 93, selected == 1, game_service_heap_allows_rps() && game->paired,
-              UI_PIXEL_ICON_RPS, NULL, "石头剪刀布", game->paired ? "纯娱乐 不增减积分" : "请先完成配对");
-    game_card(screen, 147, selected == 2, game_service_heap_allows_rps() && game->paired,
-              UI_PIXEL_ICON_BUZZER, NULL, "抢答器", game->paired ? "B3 抢答 纯娱乐" : "请先完成配对");
-    game_card(screen, 201, selected == 3, game_service_heap_allows_rps() && game->paired,
-              UI_PIXEL_ICON_RPS, &s_mole_logo, "打地鼠", game->paired ? "合作瞄准并换弹" : "请先完成配对");
-    char heap[48]; snprintf(heap, sizeof(heap), "可用内存 %lu KB", (unsigned long)(esp_get_free_heap_size() / 1024));
+    bool versus = game_service_heap_allows_rps() && game->paired;
+    /* Four 54 px rows are visible; the window follows the selection down to the last game. */
+    int first = selected > 3 ? selected - 3 : 0;
+    for (int i = first; i < first + 4 && i < UI_GAMES_COUNT; ++i) {
+        int y = 39 + (i - first) * 54;
+        if (i == 0)
+            game_card(screen, y, selected == 0, game_service_heap_allows_radar() && find_ready,
+                      UI_PIXEL_ICON_RADAR, NULL, "找" KP_PEER_LABEL, find_detail);
+        else if (i == 1)
+            game_card(screen, y, selected == 1, versus, UI_PIXEL_ICON_RPS, NULL, "石头剪刀布",
+                      game->paired ? "纯娱乐 不增减积分" : "请先完成配对");
+        else if (i == 2)
+            game_card(screen, y, selected == 2, versus, UI_PIXEL_ICON_BUZZER, NULL, "抢答器",
+                      game->paired ? "B3 抢答 纯娱乐" : "请先完成配对");
+        else if (i == 3)
+            game_card(screen, y, selected == 3, versus, UI_PIXEL_ICON_RPS, &s_mole_logo, "打地鼠",
+                      game->paired ? "合作瞄准并换弹" : "请先完成配对");
+        else
+            game_card(screen, y, selected == 4, versus, UI_PIXEL_ICON_RACE, NULL, "极速赛车",
+                      game->paired ? "抢氮气 落后可开DRS" : "请先完成配对");
+    }
+    char heap[48];
+    snprintf(heap, sizeof(heap), "第%d/%d个  可用内存 %lu KB", selected + 1, UI_GAMES_COUNT,
+             (unsigned long)(esp_get_free_heap_size() / 1024));
     lv_obj_t *h = ui_common_label_small(screen, heap, 12, 258, 216, LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_text_color(h, lv_color_hex(KP_MUTED), 0);
     if (game->state == GAME_STATE_PAIRING) ui_common_message(screen, game->status, false);

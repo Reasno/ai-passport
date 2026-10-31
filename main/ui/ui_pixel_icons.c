@@ -23,11 +23,9 @@ static const lv_image_dsc_t *icon_source(ui_pixel_icon_t icon, uint8_t scale)
     switch (icon) {
     case UI_PIXEL_ICON_TASK: return &generic_icon_task_s2;
     case UI_PIXEL_ICON_GIFT: return scale >= 3 ? &generic_icon_gift_s3 : &generic_icon_gift_s2;
-#if CONFIG_KIDS_ENABLE_GAMES
     case UI_PIXEL_ICON_GAME: return &generic_icon_game_s2;
     case UI_PIXEL_ICON_RADAR: return scale >= 5 ? &generic_icon_radar_s5 : &generic_icon_radar_s3;
     case UI_PIXEL_ICON_RPS: return scale >= 6 ? &generic_icon_rps_s6 : &generic_icon_rps_s3;
-#endif
     case UI_PIXEL_ICON_TV: return &generic_icon_tv_s3;
     case UI_PIXEL_ICON_TICKET: return &generic_icon_ticket_s3;
     case UI_PIXEL_ICON_CHECK: return scale >= 3 ? &generic_icon_check_s3 : &generic_icon_check_s2;
@@ -46,13 +44,11 @@ static const lv_image_dsc_t *full_color_source(ui_pixel_icon_t icon, uint8_t sca
     case UI_PIXEL_ICON_TASK: return scale >= 3 ? &logo_02_tasks : &logo_02_tasks_s;
     case UI_PIXEL_ICON_GIFT: return scale >= 3 ? &logo_03_rewards_m : &logo_03_rewards;
     case UI_PIXEL_ICON_TV: return &logo_03_rewards_m;
-#if CONFIG_KIDS_ENABLE_GAMES
     case UI_PIXEL_ICON_GAME: return scale >= 3 ? &logo_04_games_m : &logo_04_games;
     case UI_PIXEL_ICON_RADAR:
         if (scale >= 5) return &logo_05_find_sibling_l;
         return scale >= 3 ? &logo_05_find_sibling_m : &logo_05_find_sibling;
     case UI_PIXEL_ICON_RPS: return scale >= 3 ? &logo_06_rock_paper_scissors_m : &logo_06_rock_paper_scissors;
-#endif
     case UI_PIXEL_ICON_TICKET: return scale >= 3 ? &logo_07_lucky_wheel_m : &logo_07_lucky_wheel;
     default: return NULL;
     }
@@ -79,10 +75,7 @@ lv_obj_t *ui_home_menu_icon_create(lv_obj_t *parent, ui_pixel_icon_t icon, int x
 {
     const lv_image_dsc_t *source = icon == UI_PIXEL_ICON_TASK ? &logo_02_tasks :
                                    icon == UI_PIXEL_ICON_GIFT ? &logo_03_rewards :
-#if CONFIG_KIDS_ENABLE_GAMES
-                                   icon == UI_PIXEL_ICON_GAME ? &logo_04_games :
-#endif
-                                   icon == UI_PIXEL_ICON_CHECK ? &generic_icon_check_s3 : NULL;
+                                   icon == UI_PIXEL_ICON_GAME ? &logo_04_games : NULL;
     if (!source) return NULL;
     lv_obj_t *image = lv_image_create(parent);
     lv_image_set_src(image, source);

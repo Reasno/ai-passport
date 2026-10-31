@@ -1,5 +1,6 @@
 #pragma once
 #include "esp_err.h"
+#include <stdbool.h>
 #include <stdint.h>
 
 esp_err_t nvs_cache_init(void);
@@ -14,4 +15,8 @@ esp_err_t nvs_cache_save_rps_stats(uint32_t wins, uint32_t losses);
 esp_err_t nvs_cache_save_buzzer_stats(uint32_t wins, uint32_t losses);
 esp_err_t nvs_cache_load_mole_stats(uint32_t *wins, uint32_t *losses);
 esp_err_t nvs_cache_save_mole_stats(uint32_t wins, uint32_t losses);
+esp_err_t nvs_cache_load_race_stats(uint32_t *wins, uint32_t *losses);
+esp_err_t nvs_cache_save_race_stats(uint32_t wins, uint32_t losses);
+esp_err_t nvs_cache_load_power_saver(bool *enabled);
+esp_err_t nvs_cache_save_power_saver(bool enabled);
 esp_err_t nvs_cache_save_model(void);
