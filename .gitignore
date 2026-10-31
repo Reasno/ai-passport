@@ -1,14 +1,19 @@
 build/
-build_sister/
+build_*/
+firmware-notification/
+screenshots/
 sdkconfig
 sdkconfig.old
 sdkconfig.sister
 sdkconfig.sister.old
 sdkconfig.defaults
 sdkconfig.defaults.sister
+sdkconfig.notify*
 managed_components/
 .vscode/
 .idea/
+.DS_Store
+__pycache__/
 
 # Generated repository-local links; canonical skill sources live in skills/.
 /.agents/skills/passport-develop
