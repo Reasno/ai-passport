@@ -20,7 +20,7 @@
 #define RACE_RESULT_RETRY_MS 5000
 #define RACE_PREDICT_MS 400
 #define RACE_DRS_PENDING_MS 1000
-#define RACE_EXTRAPOLATE_MS 250
+#define RACE_EXTRAPOLATE_MS 400
 #define RACE_EVENT_SLOTS 4
 #define RACE_INPUT_LANE 1U
 #define RACE_INPUT_DRS 2U
@@ -165,7 +165,9 @@ static void send_state_locked(int64_t now)
 {
     race_wire_state_t wire;
     race_wire_from_race(&s_race, &wire);
-    send(ESPNOW_MSG_RACE_STATE, next_seq(), race_pack_state(&wire));
+    uint16_t seq = next_seq();
+    uint32_t data = race_pack_state(&wire);
+    for (int i = 0; i < 2; ++i) send(ESPNOW_MSG_RACE_STATE, seq, data);
     s_last_state_tx = now;
 }
 
