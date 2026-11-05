@@ -89,6 +89,8 @@ The tracked `dependencies.lock` pins Managed Component resolution. After changin
 
 Firmware validation uses a fresh temporary build directory and an isolated `sdkconfig` generated from the tracked defaults. It does not consume or overwrite a developer's root `sdkconfig`. Before cleaning the temporary build, it archives the verified firmware and matching debug artifacts, then copies the verified merged image to `build/FoloToy-AI-Passport-full.bin`. The gate also validates the [configured firmware layout](firmware-layout.md): image offsets from `flash_args`, partition-table MD5, bounds and non-overlap, and an application that starts in and fits its configured app partition. User-defined partition layouts are allowed.
 
+Set `SDKCONFIG_DEFAULTS` to select configuration files for a build. Without it, the gate uses the repository's `sdkconfig.defaults`. For Kids Points, build each child's role separately and check the reported `Firmware identity` before flashing: the actor, local device ID, peer ID, labels, and theme must match the intended device. The generic output filename does not identify a child's role; select the verified archive from that role's build.
+
 ### Retain matching crash-debugging artifacts
 
 Each successful firmware gate retains a local bundle under

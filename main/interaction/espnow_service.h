@@ -53,6 +53,12 @@ typedef enum {
     ESPNOW_MSG_RACE_EVENT,
     ESPNOW_MSG_RACE_ACK,
     ESPNOW_MSG_RACE_CANCEL,
+    /* Pocket Garden gift: session = gift id, choice = material. */
+    ESPNOW_MSG_GARDEN_GIFT = 80,
+    /* Receiver answer: session = gift id, choice = garden_gift_status_t. */
+    ESPNOW_MSG_GARDEN_ACK,
+    /* Sender reconciliation of an unconfirmed gift: session = gift id. */
+    ESPNOW_MSG_GARDEN_QUERY,
 } espnow_msg_type_t;
 
 typedef struct __attribute__((packed)) {

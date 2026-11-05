@@ -5,6 +5,7 @@
 #include "find_service.h"
 #include "evidence_service.h"
 #include "game_service.h"
+#include "garden_service.h"
 #include "mole_game_service.h"
 #include "mqtt_service.h"
 #include "nvs_cache.h"
@@ -17,6 +18,7 @@
 #include "ui_confirm.h"
 #include "ui_evidence.h"
 #include "ui_games.h"
+#include "ui_garden.h"
 #include "ui_home.h"
 #include "ui_lottery.h"
 #include "ui_notification.h"
@@ -33,7 +35,7 @@
 #include <stdio.h>
 #include <string.h>
 
-typedef enum { PAGE_HOME, PAGE_TASKS, PAGE_CONFIRM, PAGE_EVIDENCE, PAGE_REDEEM, PAGE_LOTTERY, PAGE_GAMES, PAGE_FIND, PAGE_RPS, PAGE_BUZZER, PAGE_MOLE, PAGE_RACE } page_t;
+typedef enum { PAGE_HOME, PAGE_TASKS, PAGE_CONFIRM, PAGE_EVIDENCE, PAGE_REDEEM, PAGE_LOTTERY, PAGE_GAMES, PAGE_FIND, PAGE_RPS, PAGE_BUZZER, PAGE_MOLE, PAGE_RACE, PAGE_GARDEN } page_t;
 static const char *TAG = "kp_ui";
 static page_t s_page = PAGE_HOME, s_confirm_return = PAGE_HOME;
 static int s_selected; static confirm_kind_t s_confirm_kind;
@@ -49,6 +51,7 @@ static bool s_buzzer_press_consumed;
 static bool s_mole_b3_block_click;
 static int64_t s_b3_press_started;
 static bool s_b3_saver_consumed;
+static int64_t s_garden_next_refresh;
 #if CONFIG_ENABLE_SCREENSHOT
 typedef enum { DEBUG_LOTTERY_IDLE, DEBUG_LOTTERY_SPIN, DEBUG_LOTTERY_RESULT } debug_lottery_t;
 typedef enum { DEBUG_BUZZER_NONE, DEBUG_BUZZER_ARMED, DEBUG_BUZZER_GO, DEBUG_BUZZER_RESULT } debug_buzzer_t;
@@ -167,6 +170,7 @@ static void render(void)
     else if (s_page == PAGE_FIND) screen = ui_find_build(model, game, s_find_status, s_find_waiting);
     else if (s_page == PAGE_RPS) screen = ui_rps_build(model, game);
     else if (s_page == PAGE_BUZZER) screen = ui_buzzer_build(model, buzzer);
+    else if (s_page == PAGE_GARDEN) screen = ui_garden_build(model);
     else if (s_page == PAGE_RACE) {
         screen = ui_race_build(model, race_snapshot());
         s_race_page_created = true;
@@ -323,12 +327,23 @@ static void begin_evidence(const char *id, const char *name)
     evidence_service_finish();
     go(PAGE_EVIDENCE, 0);
 }
+static ui_garden_feedback_t s_garden_feedback;
+static void handle_garden_result(bool leave)
+{
+    const ui_garden_feedback_t *fb = &s_garden_feedback;
+    if (fb->message[0]) set_message(fb->message, fb->error);
+    if (fb->sound >= 0) sound_service_play((sound_effect_t)fb->sound);
+    /* Pairing lives on the games list (hold B3), the device's existing entry. */
+    if (fb->open_pairing) go(PAGE_GAMES, 0);
+    else if (leave) go(PAGE_GAMES, UI_GAMES_GARDEN);
+    else render();
+}
 static void handle_short_key(bsp_btn_t key)
 {
     app_model_snapshot_t *model = model_snapshot(); game_snapshot_t *game = game_snapshot();
     buzzer_game_snapshot_t *buzzer = buzzer_snapshot();
     mole_game_snapshot_t *mole = mole_snapshot();
-    if (model->pending_type != APP_PENDING_NONE && s_page != PAGE_LOTTERY && s_page != PAGE_GAMES && s_page != PAGE_FIND && s_page != PAGE_RPS && s_page != PAGE_BUZZER && s_page != PAGE_MOLE && s_page != PAGE_RACE) return;
+    if (model->pending_type != APP_PENDING_NONE && s_page != PAGE_LOTTERY && s_page != PAGE_GAMES && s_page != PAGE_FIND && s_page != PAGE_RPS && s_page != PAGE_BUZZER && s_page != PAGE_MOLE && s_page != PAGE_RACE && s_page != PAGE_GARDEN) return;
     int delta = key == BSP_BTN_UP ? -1 : 1;
     if (s_page == PAGE_HOME) {
         if (key != BSP_BTN_OK) key_move(delta, 3);
@@ -363,6 +378,7 @@ static void handle_short_key(bsp_btn_t key)
     else if (s_page == PAGE_GAMES) {
         if (key != BSP_BTN_OK) key_move(delta, UI_GAMES_COUNT);
         /* Find only needs one live transport; both competitive games require pairing. */
+        else if (s_selected == UI_GAMES_GARDEN) { ui_garden_enter(); go(PAGE_GARDEN, 0); }
         else if (s_selected == 0) {
             if (!game->paired && !model->mqtt_online) { set_message("请长按B3先配对", false); render(); }
             else if (!game_service_heap_allows_radar()) { set_message("内存不足\n找" KP_PEER_LABEL "暂不可用", true); render(); }
@@ -429,6 +445,8 @@ static void handle_short_key(bsp_btn_t key)
                    key == BSP_BTN_OK) {
             mole_game_service_begin_session();
         }
+    } else if (s_page == PAGE_GARDEN) {
+        handle_garden_result(ui_garden_key(key, &s_garden_feedback));
     } else if (s_page == PAGE_RACE) {
         race_game_snapshot_t *race = race_snapshot();
         if (race->phase == RACE_PHASE_INVITE_RECEIVED) {
@@ -572,6 +590,11 @@ static void process_event(const app_event_t *event)
             s_mole_b3_block_click = false;
             return;
         }
+        /* In the garden a B3 long press goes back one level instead of pairing. */
+        if (b3_pair_on_release && s_page == PAGE_GARDEN) {
+            handle_garden_result(ui_garden_back(&s_garden_feedback));
+            return;
+        }
         if (b3_pair_on_release && s_page == PAGE_GAMES) {
             if (game_service_heap_allows_pairing()) { game_service_start_pairing(); go(PAGE_GAMES, 0); }
             else { set_message("内存不足，无法配对", true); render(); }
@@ -713,7 +736,7 @@ static bool ui_busy(void)
            (game->state != GAME_STATE_IDLE && game->state != GAME_STATE_RESULT) ||
            (buzzer->state != BUZZER_STATE_IDLE && buzzer->state != BUZZER_STATE_RESULT) ||
            (mole->phase != MOLE_PHASE_IDLE && mole->phase != MOLE_PHASE_RESULT) ||
-           (race->phase != RACE_PHASE_IDLE && race->phase != RACE_PHASE_RESULT);
+           (race->phase != RACE_PHASE_IDLE && race->phase != RACE_PHASE_RESULT) || garden_service_busy();
 }
 static void ui_task(void *arg)
 {
@@ -745,12 +768,14 @@ static void ui_task(void *arg)
                 buzzer_game_service_tick(now);
                 mole_game_service_tick(now);
                 race_game_service_tick(now);
+                garden_service_tick(now);
             }
 #else
             game_service_tick(now);
             buzzer_game_service_tick(now);
             mole_game_service_tick(now);
             race_game_service_tick(now);
+            garden_service_tick(now);
 #endif
             next_game_tick = now + 50;
             if (s_page == PAGE_MOLE && s_mole_page_created) {
@@ -811,6 +836,11 @@ static void ui_task(void *arg)
         if (s_lottery_animating && now >= s_lottery_reveal_at) {
             s_lottery_animating = false;
             sound_service_play(SOUND_FANFARE);
+            render();
+        }
+        /* Live garden pages follow growth, water and day/night without a key press. */
+        if (s_page == PAGE_GARDEN && !s_message[0] && ui_garden_live_page() && now >= s_garden_next_refresh) {
+            s_garden_next_refresh = now + 30000;
             render();
         }
         if (s_message[0] && now >= s_message_until) {

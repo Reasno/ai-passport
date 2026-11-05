@@ -2,6 +2,7 @@
 #include "buzzer_game_service.h"
 #include "find_service.h"
 #include "game_service.h"
+#include "garden_service.h"
 #include "mole_game_service.h"
 #include "ptt_service.h"
 #include "race_game_service.h"
@@ -60,6 +61,12 @@ static void recv_cb(const esp_now_recv_info_t *info, const uint8_t *data, int le
     event.rssi = info->rx_ctrl ? info->rx_ctrl->rssi : -127;
     xQueueSend(s_queue, &event, 0); /* Wi-Fi callback stays non-blocking. */
 }
+static void send_cb(const esp_now_send_info_t *info, esp_now_send_status_t status)
+{
+    /* A MAC-layer ACK from the peer proves at least one frame reached its radio. */
+    if (info && info->des_addr && s_has_peer && memcmp(info->des_addr, s_peer, 6) == 0)
+        garden_service_on_send_status(status == ESP_NOW_SEND_SUCCESS);
+}
 static void rx_task(void *arg)
 {
     (void)arg; rx_event_t event;
@@ -78,6 +85,12 @@ static void rx_task(void *arg)
         if (p->type == ESPNOW_MSG_FIND_RING || p->type == ESPNOW_MSG_FIND_ACK) {
             if (!s_has_peer || memcmp(s_peer, event.src, 6) != 0) continue;
             find_service_on_espnow(p->type == ESPNOW_MSG_FIND_RING, espnow_find_ts(p));
+            continue;
+        }
+        if (garden_service_owns_packet(p->type)) {
+            /* Gifts only move between the saved sibling pair. */
+            if (!s_has_peer || memcmp(s_peer, event.src, 6) != 0) continue;
+            garden_service_on_packet(event.src, p);
             continue;
         }
         if (buzzer_game_service_owns_packet(p->type))
@@ -168,6 +181,7 @@ esp_err_t espnow_service_start(void)
     if ((err = esp_wifi_connectionless_module_set_wake_interval(ESPNOW_WAKE_INTERVAL_MS)) != ESP_OK) return err;
     if ((err = esp_now_set_wake_window(ESPNOW_WAKE_WINDOW_MS)) != ESP_OK) return err;
     if ((err = esp_now_register_recv_cb(recv_cb)) != ESP_OK) return err;
+    if ((err = esp_now_register_send_cb(send_cb)) != ESP_OK) return err;
     if (!add_peer(BROADCAST)) return ESP_FAIL;
     load_peer();
     if (xTaskCreatePinnedToCore(rx_task, "kp_espnow", 3072, NULL, 4, NULL, 0) != pdPASS) return ESP_ERR_NO_MEM;

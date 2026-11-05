@@ -49,6 +49,7 @@ esp_err_t gpio_wakeup_enable(gpio_num_t, gpio_int_type_t);
 esp_err_t esp_sleep_enable_gpio_wakeup(void);
 esp_err_t esp_wifi_set_ps(wifi_ps_type_t);
 esp_err_t esp_wifi_connect(void);
+bool usb_serial_jtag_is_connected(void);
 esp_err_t lvgl_port_stop(void);
 esp_err_t lvgl_port_resume(void);
 esp_err_t esp_sleep_disable_wakeup_source(int);
@@ -76,7 +77,8 @@ SOURCE = r"""
 static int64_t now;
 static char calls[64];
 static int used, failure, terminal, brightness, held, ps, reconnects, locks;
-static bool lvgl_stopped, timer_armed, stored_saver, saved, online;
+static bool lvgl_stopped, timer_armed, stored_saver, saved, online, usb_connected;
+static int usb_reads, connect_on_read, standby_entries;
 static esp_err_t load_error;
 static uint64_t timer_delay_ms;
 static void (*timer_callback)(void *);
@@ -114,7 +116,11 @@ esp_err_t gpio_wakeup_enable(gpio_num_t pin, gpio_int_type_t type) {
 esp_err_t esp_sleep_enable_gpio_wakeup(void) { return ESP_OK; }
 esp_err_t esp_wifi_set_ps(wifi_ps_type_t type) { ps = type; return ESP_OK; }
 esp_err_t esp_wifi_connect(void) { reconnects++; return ESP_OK; }
-esp_err_t lvgl_port_stop(void) { lvgl_stopped = true; return ESP_OK; }
+bool usb_serial_jtag_is_connected(void) {
+    if (++usb_reads == connect_on_read) usb_connected = true;
+    return usb_connected;
+}
+esp_err_t lvgl_port_stop(void) { lvgl_stopped = true; standby_entries++; return ESP_OK; }
 esp_err_t lvgl_port_resume(void) { lvgl_stopped = false; return ESP_OK; }
 void app_model_snapshot(app_model_snapshot_t *out) { memset(out, 0, sizeof(*out)); out->wifi_online = online; }
 esp_err_t nvs_cache_load_power_saver(bool *enabled) { *enabled = load_error ? true : stored_saver; return load_error; }
@@ -142,6 +148,7 @@ static void reset(bool saver, int inject) {
     used = 0; calls[0] = 0; failure = inject; terminal = 0; now = 0; held = 0; ps = WIFI_PS_NONE;
     reconnects = 0; lvgl_stopped = false; timer_armed = false; stored_saver = saver; saved = false;
     load_error = ESP_OK; online = false;
+    usb_connected = false; usb_reads = 0; connect_on_read = 0; standby_entries = 0;
     assert(power_service_start() == ESP_OK);
     assert(held == 1 && locks == 0);
 }
@@ -183,6 +190,49 @@ int main(void) {
     if (!setjmp(jump)) power_service_poll(false);
     assert(terminal == 1);
 
+    /* A connected host suppresses terminal sleep, even after a long idle period. */
+    reset(true, 0);
+    usb_connected = true;
+    now = 30000; power_service_poll(false); assert(brightness == 20);
+    now = 60000; power_service_poll(false);
+    assert(brightness == 0 && lvgl_stopped && !terminal && !used && standby_entries == 1);
+    now = 600000; power_service_poll(false);
+    assert(!terminal && !used && standby_entries == 1 && stored_saver);
+
+    /* A remote wake and a busy operation still resume the display in USB standby. */
+    power_service_wake(); assert(brightness == 80 && !lvgl_stopped);
+    now += 60000; power_service_poll(false); assert(lvgl_stopped && brightness == 0);
+    power_service_poll(true); assert(brightness == 80 && !lvgl_stopped && !terminal);
+    now += 60000; power_service_poll(false); assert(lvgl_stopped && brightness == 0);
+
+    /* Unplugging starts a fresh 60-second deadline without changing the mode. */
+    usb_connected = false;
+    now = 800000; power_service_poll(false);
+    assert(brightness == 80 && !lvgl_stopped && !terminal && !used && stored_saver && !saved);
+    now = 829999; power_service_poll(false); assert(brightness == 80);
+    now = 830000; power_service_poll(false); assert(brightness == 20);
+    now = 859999; power_service_poll(false); assert(!terminal && !used);
+    now = 860000;
+    if (!setjmp(jump)) power_service_poll(false);
+    assert(terminal == 1 && strcmp(calls, "WBANbasiLdS") == 0);
+
+    /* Reconnecting during the countdown cancels its pending deep sleep. */
+    reset(true, 0);
+    usb_connected = true; now = 60000; power_service_poll(false);
+    usb_connected = false; now = 61000; power_service_poll(false);
+    usb_connected = true; now = 120000; power_service_poll(false); assert(!terminal);
+    now = 121000; power_service_poll(false); assert(lvgl_stopped && !terminal && !used);
+    assert(power_service_key_activity() && !lvgl_stopped);
+
+    /* Recheck the live USB signal at the final shutdown entry to catch reconnection
+     * after policy evaluation but before the first peripheral is stopped. */
+    reset(true, 0);
+    now = 60000; usb_reads = 0; connect_on_read = 2;
+    power_service_poll(false);
+    assert(!terminal && !used);
+    power_service_poll(false); assert(lvgl_stopped && brightness == 0);
+    assert(power_service_key_activity());
+
     reset(true, 0);
     now = 60000; power_service_poll(true); assert(!terminal && brightness == 80);
     now = 60001; power_service_poll(false); assert(!terminal);
@@ -219,7 +269,7 @@ with tempfile.TemporaryDirectory(prefix="passport-power-") as directory:
     for name in ("esp_err", "bsp_audio", "bsp_battery", "bsp_display", "bsp_i2c", "bsp_pins",
                  "battery_service", "sound_service", "wifi_service", "esp_log", "esp_lvgl_port",
                  "esp_pm", "esp_sleep", "esp_system", "esp_timer", "esp_wifi",
-                 "driver/gpio", "freertos/FreeRTOS", "freertos/semphr"):
+                 "driver/gpio", "driver/usb_serial_jtag", "freertos/FreeRTOS", "freertos/semphr"):
         (stub / f"{name}.h").write_text('#include "platform.h"\n')
     (stub / "test.c").write_text(SOURCE)
     subprocess.run([

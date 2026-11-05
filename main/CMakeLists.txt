@@ -22,6 +22,8 @@ idf_component_register(
          "interaction/mole_game_service.c"
          "interaction/race_rules.c"
          "interaction/race_game_service.c"
+         "interaction/garden_rules.c"
+         "interaction/garden_service.c"
          "interaction/ptt_service.c"
          "interaction/evidence_service.c"
          "ui/ui_app.c"
@@ -37,10 +39,12 @@ idf_component_register(
          "ui/ui_lottery.c"
          "ui/ui_games.c"
          "ui/ui_race.c"
+         "ui/ui_garden.c"
          "ui/ui_pixel_icons.c"
          "assets/avatar_brother.c"
          "assets/avatar_sister.c"
          "assets/lottery_assets.c"
+         "assets/garden_assets.c"
          ${GENERIC_ICON_SRCS}
          ${LOGO_ARGB8888_SRCS}
          "sound/sound_service.c"

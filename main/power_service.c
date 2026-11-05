@@ -11,6 +11,7 @@
 #include "sound_service.h"
 #include "wifi_service.h"
 #include "driver/gpio.h"
+#include "driver/usb_serial_jtag.h"
 #include "esp_log.h"
 #include "esp_lvgl_port.h"
 #include "esp_sleep.h"
@@ -35,6 +36,7 @@ static int64_t s_last_activity_ms;
 static uint8_t s_level = ACTIVE_BACKLIGHT;
 static bool s_lvgl_stopped;
 static bool s_saver;
+static bool s_usb_connected;
 #ifdef CONFIG_PM_ENABLE
 static esp_pm_lock_handle_t s_awake_lock;
 static bool s_awake_lock_held;
@@ -137,7 +139,7 @@ static void timer_cb(void *arg)
 
     if (!s_saver) {
         int64_t idle = now_ms() - s_last_activity_ms;
-        power_state_t state = power_policy_state(idle, false, false);
+        power_state_t state = power_policy_state(idle, false, false, false);
         if (state == POWER_ACTIVE) {
             arm_timer_locked(POWER_DIM_MS - idle);
         } else if (state == POWER_DIM) {
@@ -156,6 +158,8 @@ static void timer_cb(void *arg)
 
 static void deep_sleep(void)
 {
+    /* Check the live connection again before any terminal peripheral teardown. */
+    if (usb_serial_jtag_is_connected()) return;
     /* No ADC, timer, radio or USB wake source. The separate hardware power
      * button restores power; it is not an MCU GPIO exposed by this board. */
     if (esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL) != ESP_OK) return;
@@ -193,6 +197,7 @@ esp_err_t power_service_start(void)
         s_saver = false;
     }
     s_last_activity_ms = now_ms();
+    s_usb_connected = usb_serial_jtag_is_connected();
     s_level = ACTIVE_BACKLIGHT;
     bsp_display_backlight(ACTIVE_BACKLIGHT);
 
@@ -225,9 +230,9 @@ esp_err_t power_service_start(void)
 void power_service_wake(void)
 {
     if (!s_lock || xSemaphoreTake(s_lock, portMAX_DELAY) != pdTRUE) return;
-    /* In power-saving mode an incoming message may brighten an awake screen,
-     * but cannot extend the idle deadline. */
-    if (s_saver) level(ACTIVE_BACKLIGHT);
+    /* Battery-powered saver mode does not extend the idle deadline for incoming
+     * messages. USB standby uses the resumable display/connection wake path. */
+    if (s_saver && !usb_serial_jtag_is_connected()) level(ACTIVE_BACKLIGHT);
     else restore_locked("远程事件");
     xSemaphoreGive(s_lock);
 }
@@ -273,12 +278,29 @@ bool power_service_saver_enabled(void)
 void power_service_poll(bool busy)
 {
     /* s_saver is written only by the UI worker, which is also the only caller. */
-    if (!s_lock || !s_saver) return;
+    if (!s_lock) return;
     if (xSemaphoreTake(s_lock, portMAX_DELAY) != pdTRUE) return;
+    bool usb_connected = usb_serial_jtag_is_connected();
+    if (s_usb_connected != usb_connected) {
+        if (s_saver && !usb_connected) restore_locked("USB disconnected");
+        ESP_LOGI(TAG, "USB host %s; power saver=%d", usb_connected ? "connected" : "disconnected", s_saver);
+        s_usb_connected = usb_connected;
+    }
+    if (!s_saver) {
+        xSemaphoreGive(s_lock);
+        return;
+    }
     int64_t now = now_ms();
     if (busy) s_last_activity_ms = now;
-    power_state_t state = power_policy_state(now - s_last_activity_ms, busy, true);
-    level(state == POWER_ACTIVE ? ACTIVE_BACKLIGHT : DIM_BACKLIGHT);
+    int64_t idle = now - s_last_activity_ms;
+    power_state_t state = power_policy_state(idle, busy, true, usb_connected);
+    if (state == POWER_STANDBY) {
+        /* Only enter once; keep the UI worker, radio and USB connection monitor live. */
+        if (s_level != 0 || !s_lvgl_stopped) standby_locked(idle);
+    } else {
+        if (s_lvgl_stopped) restore_locked("Active operation");
+        level(state == POWER_ACTIVE ? ACTIVE_BACKLIGHT : DIM_BACKLIGHT);
+    }
     xSemaphoreGive(s_lock);
     if (state == POWER_DEEP_SLEEP) deep_sleep();
 }

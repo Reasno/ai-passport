@@ -1,0 +1,27 @@
+{
+  "native_asset_count": 70,
+  "stage_count": 24,
+  "dry_count": 18,
+  "deficient_count": 12,
+  "icon_count": 9,
+  "effect_count": 7,
+  "palette_opaque_count": 24,
+  "binary_alpha": true,
+  "shared_palette_valid": true,
+  "native_png_bytes": 36502,
+  "static_rgb565_plus_1bit_mask_bytes": 117504,
+  "current_sprite_rgb565_plus_1bit_mask_bytes": 4896,
+  "display_96x96_rgb565_bytes": 18432,
+  "generation": {
+    "tool": "GenerateImage",
+    "source": "plant-style-concept.jpg",
+    "role": "concept direction"
+  },
+  "reconstruction": "Native 48x48 grid; manually specified silhouette and leaf clusters; no resampling from generated concept.",
+  "unverified": [
+    "child blind recognition",
+    "physical LCD colors",
+    "firmware font rendering",
+    "on-device memory and decode timing"
+  ]
+}

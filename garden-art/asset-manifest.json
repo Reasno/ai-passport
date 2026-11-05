@@ -1,0 +1,1394 @@
+{
+  "title": "Pocket garden plant art",
+  "logical_canvas": [
+    48,
+    48
+  ],
+  "display_scale": 2,
+  "anchor": [
+    24,
+    40
+  ],
+  "palette": {
+    "outline": "#293D36",
+    "leaf_dark": "#315843",
+    "leaf": "#4D7850",
+    "leaf_light": "#83AB61",
+    "leaf_high": "#BAD57D",
+    "sage": "#62948A",
+    "sage_light": "#9AC2AA",
+    "soil_dark": "#71513C",
+    "soil": "#9C7550",
+    "soil_light": "#CA9B65",
+    "seed": "#E3C58F",
+    "radish_dark": "#983955",
+    "radish": "#CF5572",
+    "radish_light": "#F38C98",
+    "red_dark": "#A4433F",
+    "red": "#D9684A",
+    "red_light": "#F49E70",
+    "yellow": "#E2C764",
+    "pale": "#F4E5B6",
+    "water_dark": "#326D8E",
+    "water": "#69AAC1",
+    "white": "#F9F5E7",
+    "insect": "#534854",
+    "night": "#454F72"
+  },
+  "species": [
+    {
+      "id": "radish",
+      "name": "樱桃萝卜",
+      "identity": "裂叶与圆形块根",
+      "harvest_part": "根"
+    },
+    {
+      "id": "lettuce",
+      "name": "散叶生菜",
+      "identity": "松散的波浪叶丛",
+      "harvest_part": "叶"
+    },
+    {
+      "id": "basil",
+      "name": "甜罗勒",
+      "identity": "对生宽卵形叶",
+      "harvest_part": "叶"
+    },
+    {
+      "id": "bean",
+      "name": "矮生菜豆",
+      "identity": "三出复叶与下垂豆荚",
+      "harvest_part": "嫩荚"
+    },
+    {
+      "id": "tomato",
+      "name": "番茄",
+      "identity": "锯齿叶与星形果萼",
+      "harvest_part": "果"
+    },
+    {
+      "id": "rosemary",
+      "name": "迷迭香",
+      "identity": "木质枝干与窄针叶",
+      "harvest_part": "嫩枝"
+    }
+  ],
+  "stages": [
+    "seed",
+    "seedling",
+    "growing",
+    "mature"
+  ],
+  "assets": [
+    {
+      "id": "radish-seed",
+      "file": "radish-seed.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 4,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "7239a6605989129583dc1943c36dfc22e8d1afd2ef3da5f3a5eba3f65ab33f61",
+      "species": "radish",
+      "stage": "seed",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "radish-seed-dry",
+      "file": "radish-seed-dry.png",
+      "category": "plant-dry",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 4,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "3dad6989bd664dffb63ac0aeeb153e4e855f45884cdb9ef9ec039d7d5c7c2a11",
+      "species": "radish",
+      "stage": "seed",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "radish-seedling",
+      "file": "radish-seedling.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 7,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "57ebd88fb25625d9c08e4c66e4073a26abab9156abd7e3cc4d322701ffd12c60",
+      "species": "radish",
+      "stage": "seedling",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "radish-seedling-dry",
+      "file": "radish-seedling-dry.png",
+      "category": "plant-dry",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 7,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "d792b08d2e8eca46bec5c20b3eee69c618711807242c90191ebc71cea6b20373",
+      "species": "radish",
+      "stage": "seedling",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "radish-seedling-deficient",
+      "file": "radish-seedling-deficient.png",
+      "category": "plant-deficient",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 9,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "95fcf0e22c2eacb6c8d1297715ed845649f19904f8183ea2f349104b25c6a228",
+      "species": "radish",
+      "stage": "seedling",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "radish-growing",
+      "file": "radish-growing.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 12,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "bacabd04a6f3543d69175106a38d45a3b02372220d5af26b4d1e13abcd0f806e",
+      "species": "radish",
+      "stage": "growing",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "radish-growing-dry",
+      "file": "radish-growing-dry.png",
+      "category": "plant-dry",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 11,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "6ddb7a9fb1b46c09f396a3e112a5422e9e6f22635b379abdd1535ce9b3a181a7",
+      "species": "radish",
+      "stage": "growing",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "radish-growing-deficient",
+      "file": "radish-growing-deficient.png",
+      "category": "plant-deficient",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 15,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "01cf24b6642058cdde6bd16be07aaf3be93a324861c3fbdd2c62d94d5c8968b4",
+      "species": "radish",
+      "stage": "growing",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "radish-mature",
+      "file": "radish-mature.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 12,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "79c4cf7ab412c7bb92fbbf7b05e9890f8cb7b34d0c00c40b761d654caeec34fb",
+      "species": "radish",
+      "stage": "mature",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "lettuce-seed",
+      "file": "lettuce-seed.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 5,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "1dbee89e3044a1b8f25126def0bddaeb7819289a4ba5eec84908da65e33b1553",
+      "species": "lettuce",
+      "stage": "seed",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "lettuce-seed-dry",
+      "file": "lettuce-seed-dry.png",
+      "category": "plant-dry",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 4,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "b089e2e8d182858ba7cef75ad8a9922b92712b625c6b34c69070f00e2cb418e4",
+      "species": "lettuce",
+      "stage": "seed",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "lettuce-seedling",
+      "file": "lettuce-seedling.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 7,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "256eb81026a452903f28c734c6f19b77f152d2add434db7aca93356fee2971cf",
+      "species": "lettuce",
+      "stage": "seedling",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "lettuce-seedling-dry",
+      "file": "lettuce-seedling-dry.png",
+      "category": "plant-dry",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 7,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "3a84f3d23679b7a07f65d52c565660e6cb670c1296dac8b64ba687ba24bfee23",
+      "species": "lettuce",
+      "stage": "seedling",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "lettuce-seedling-deficient",
+      "file": "lettuce-seedling-deficient.png",
+      "category": "plant-deficient",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 8,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "1bf5ec4606dfeeaf8302533b6f18ad24c9d8fbc4cb6d5c24a809f42a201230f1",
+      "species": "lettuce",
+      "stage": "seedling",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "lettuce-growing",
+      "file": "lettuce-growing.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 8,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "1eb9aa50dd79fc9d11fd43d718c2ca341f49c243332a60e4be8e241f1640bee6",
+      "species": "lettuce",
+      "stage": "growing",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "lettuce-growing-dry",
+      "file": "lettuce-growing-dry.png",
+      "category": "plant-dry",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 8,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "bd58d6f7b76bc518fe5f895fc4161bf912f916c94b90278500ff58865d140ecf",
+      "species": "lettuce",
+      "stage": "growing",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "lettuce-growing-deficient",
+      "file": "lettuce-growing-deficient.png",
+      "category": "plant-deficient",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 11,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "0b46e15b3154a797d6574c96659feaa18358bca0ee29595dfd1548a82f7030dd",
+      "species": "lettuce",
+      "stage": "growing",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "lettuce-mature",
+      "file": "lettuce-mature.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 8,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "44e12821f36aa9540bb72d4ca07e6ef97062fc63409926b5beb1e904652fef77",
+      "species": "lettuce",
+      "stage": "mature",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "basil-seed",
+      "file": "basil-seed.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 6,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "0fbc0807b608b65728c0fa04eba4be2fd40de7e17a204925966cb901af8a135e",
+      "species": "basil",
+      "stage": "seed",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "basil-seed-dry",
+      "file": "basil-seed-dry.png",
+      "category": "plant-dry",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 5,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "a6e1584253cc1e3f593dae46f247cbb56816688faad45eb6f9853f02ad08a96d",
+      "species": "basil",
+      "stage": "seed",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "basil-seedling",
+      "file": "basil-seedling.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 8,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "2845d23e9e3e2ad0c7acecc83bb46ded31c13db14819c8b1cb96812de747965f",
+      "species": "basil",
+      "stage": "seedling",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "basil-seedling-dry",
+      "file": "basil-seedling-dry.png",
+      "category": "plant-dry",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 8,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "85373abaf6979cd42b072d49b2f9bdeb5c927751d0738698c0467cf611204a35",
+      "species": "basil",
+      "stage": "seedling",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "basil-seedling-deficient",
+      "file": "basil-seedling-deficient.png",
+      "category": "plant-deficient",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 11,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "2f42f8693914514012a8bb5038207c4a21cce15abcd523845deb9f74b22fc09f",
+      "species": "basil",
+      "stage": "seedling",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "basil-growing",
+      "file": "basil-growing.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 8,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "a595623705df987e04c7733cbeeb603a470da1e00b52033f4ba50b29528f1e28",
+      "species": "basil",
+      "stage": "growing",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "basil-growing-dry",
+      "file": "basil-growing-dry.png",
+      "category": "plant-dry",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 8,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "0b0757587a78126ef0f59d8f9c6d0a5cbf247b2df7ff340a5aae9acf98a31f30",
+      "species": "basil",
+      "stage": "growing",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "basil-growing-deficient",
+      "file": "basil-growing-deficient.png",
+      "category": "plant-deficient",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 11,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "29cc0fc4d5ad0b47d1713be493156427111cf2d1dd0e8d6bc72d32e667b00515",
+      "species": "basil",
+      "stage": "growing",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "basil-mature",
+      "file": "basil-mature.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 8,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "549616121af0dc7a08ddbe0502bc8d8b9730ec5e4b536906b36dda841e3c7cfa",
+      "species": "basil",
+      "stage": "mature",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "bean-seed",
+      "file": "bean-seed.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 5,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "ca4ef88e3df2500e4d6f567eca0735940825d0b7f0ed0f76a537ee22ee2e7324",
+      "species": "bean",
+      "stage": "seed",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "bean-seed-dry",
+      "file": "bean-seed-dry.png",
+      "category": "plant-dry",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 4,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "0588f465b7de3e251997cb595d28995ef7c2d22cfc1ac143ea415456163a8012",
+      "species": "bean",
+      "stage": "seed",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "bean-seedling",
+      "file": "bean-seedling.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 7,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "fea61be5fc9e9b2f96b69497ad55b831f7e3752f6e5b35b66aa7f617ace28f1f",
+      "species": "bean",
+      "stage": "seedling",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "bean-seedling-dry",
+      "file": "bean-seedling-dry.png",
+      "category": "plant-dry",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 7,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "62c1ff483f95d3575e2c210fe31793cac655ace1b1bbd351a63cd53ec1bb94d2",
+      "species": "bean",
+      "stage": "seedling",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "bean-seedling-deficient",
+      "file": "bean-seedling-deficient.png",
+      "category": "plant-deficient",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 9,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "35a9261313072e7d072c02b9e9addc0ec240c04b28a57eee176857b9327b91e5",
+      "species": "bean",
+      "stage": "seedling",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "bean-growing",
+      "file": "bean-growing.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 10,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "82e46dc1956bf6c2f32d01707e340f55f14aa77177c4cba0e227cbf0d57efea8",
+      "species": "bean",
+      "stage": "growing",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "bean-growing-dry",
+      "file": "bean-growing-dry.png",
+      "category": "plant-dry",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 10,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "ae3cfb870bd4ea2792cc130c10c0a4432e2821639c697cac7a7964bb63355db9",
+      "species": "bean",
+      "stage": "growing",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "bean-growing-deficient",
+      "file": "bean-growing-deficient.png",
+      "category": "plant-deficient",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 11,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "c53dec5715d93b2f5daa556db17dcc17ba25772ece2fb64d0d696a98cfa96c9c",
+      "species": "bean",
+      "stage": "growing",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "bean-mature",
+      "file": "bean-mature.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 8,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "e93ae5dbf61e66ee0ce9a9899d7811b3fb20a75b084737096ac1d7e3b6253743",
+      "species": "bean",
+      "stage": "mature",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "tomato-seed",
+      "file": "tomato-seed.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 5,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "56a43bc44fc092f2e8189db3d8f022390cfc29bee823bd16be1ed90fdd435c2e",
+      "species": "tomato",
+      "stage": "seed",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "tomato-seed-dry",
+      "file": "tomato-seed-dry.png",
+      "category": "plant-dry",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 4,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "12321ca761d8b4409928f66dfc7de01d24a996b9c7186f035695a44b47306a82",
+      "species": "tomato",
+      "stage": "seed",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "tomato-seedling",
+      "file": "tomato-seedling.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 7,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "45da5f3a946010337dfc3303f52d456412b0ecf1f6dffa17cdcc441dad8b0ad4",
+      "species": "tomato",
+      "stage": "seedling",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "tomato-seedling-dry",
+      "file": "tomato-seedling-dry.png",
+      "category": "plant-dry",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 7,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "3872f4d44e718e2d6d032cd0b62cd44de748f4bfefb5ede1ddcee7c5b710b398",
+      "species": "tomato",
+      "stage": "seedling",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "tomato-seedling-deficient",
+      "file": "tomato-seedling-deficient.png",
+      "category": "plant-deficient",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 9,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "1b2b515b50e32682012d6e314acab22c5f4567fd656af4b7f5af999d6e5a5560",
+      "species": "tomato",
+      "stage": "seedling",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "tomato-growing",
+      "file": "tomato-growing.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 10,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "b52f1a702a2cc792396a506aeae50dad9af060cee7777e0744c45af93c9cee91",
+      "species": "tomato",
+      "stage": "growing",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "tomato-growing-dry",
+      "file": "tomato-growing-dry.png",
+      "category": "plant-dry",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 10,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "6e2b88ca3af34d9cc6395b8630eb039a2d7eaebdb5557f5cdd925180f083e253",
+      "species": "tomato",
+      "stage": "growing",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "tomato-growing-deficient",
+      "file": "tomato-growing-deficient.png",
+      "category": "plant-deficient",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 11,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "ff1525c56d8eee7d035d6fe374b4ba6a87a7688ffd5dd7f50c12ff63539e20ba",
+      "species": "tomato",
+      "stage": "growing",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "tomato-mature",
+      "file": "tomato-mature.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 11,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "e27ccd584ae8bc23ead7a1a25ef2a99c070ce06e4ff016e44d4a050912f42f74",
+      "species": "tomato",
+      "stage": "mature",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "rosemary-seed",
+      "file": "rosemary-seed.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 4,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "d9056f91f3d2b044d8178774be4aa2b7f6711990d327b312d07473e8f615113f",
+      "species": "rosemary",
+      "stage": "seed",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "rosemary-seed-dry",
+      "file": "rosemary-seed-dry.png",
+      "category": "plant-dry",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 4,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "071915ba3653bddc4ae3ba721787b5d6b9e8f190db2961f2ee357ad2c6606cdc",
+      "species": "rosemary",
+      "stage": "seed",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "rosemary-seedling",
+      "file": "rosemary-seedling.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 6,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "32b31b042be43575f3d43d4223399e4777f0f0eea3663cc5539209199a48c1ff",
+      "species": "rosemary",
+      "stage": "seedling",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "rosemary-seedling-dry",
+      "file": "rosemary-seedling-dry.png",
+      "category": "plant-dry",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 6,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "6fdc1f0f93167f2aee25156077d8427380fefed2354729959f7e0270d2a4bbb7",
+      "species": "rosemary",
+      "stage": "seedling",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "rosemary-seedling-deficient",
+      "file": "rosemary-seedling-deficient.png",
+      "category": "plant-deficient",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 6,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "42f8d2d13be5ac690acc7eadc1a373b1085bea44145fbddc9843419b2fda8941",
+      "species": "rosemary",
+      "stage": "seedling",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "rosemary-growing",
+      "file": "rosemary-growing.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 7,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "c44fd7be3c757fb4a4ff741a19dae86ae53d660a67fb16bdc8d91b11b9916b23",
+      "species": "rosemary",
+      "stage": "growing",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "rosemary-growing-dry",
+      "file": "rosemary-growing-dry.png",
+      "category": "plant-dry",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 6,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "f52a1253bcdf55993934303e8ccd2c4970b8a35e414c9b769c9c41df8ece4710",
+      "species": "rosemary",
+      "stage": "growing",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "rosemary-growing-deficient",
+      "file": "rosemary-growing-deficient.png",
+      "category": "plant-deficient",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 8,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "f52287e342f950b6ee07ffdfb31b3c8d97aaa9c40fad315f074c34f1a8ce561f",
+      "species": "rosemary",
+      "stage": "growing",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "rosemary-mature",
+      "file": "rosemary-mature.png",
+      "category": "plant-stage",
+      "width": 48,
+      "height": 48,
+      "opaque_colors": 7,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "ab37ce579ea7e0e783bbf2dba476b4b7ed7a06c0abf1e73e6dd9c685609cc32b",
+      "species": "rosemary",
+      "stage": "mature",
+      "anchor": [
+        24,
+        40
+      ]
+    },
+    {
+      "id": "icon-water",
+      "file": "icon-water.png",
+      "category": "icon",
+      "width": 16,
+      "height": 16,
+      "opaque_colors": 3,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "351931330c3385cd3c6f68148dbbf9d09ad9f3197829a894f3ad753e5029277c"
+    },
+    {
+      "id": "icon-fertilizer",
+      "file": "icon-fertilizer.png",
+      "category": "icon",
+      "width": 16,
+      "height": 16,
+      "opaque_colors": 6,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "b88e531c128a89c2869d5fb78d7bfcb1d63e6c92216f3916983252d75a00a0b4"
+    },
+    {
+      "id": "icon-weed_bottle",
+      "file": "icon-weed_bottle.png",
+      "category": "icon",
+      "width": 16,
+      "height": 16,
+      "opaque_colors": 3,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "85589cd8af338c090563883ae44949cd21493f64192dedef80853b23ae25305f"
+    },
+    {
+      "id": "icon-pest_bottle",
+      "file": "icon-pest_bottle.png",
+      "category": "icon",
+      "width": 16,
+      "height": 16,
+      "opaque_colors": 4,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "a82a6a2147727318898ce6f40bf9cdfe1af1f26f291a2d580021e4ff4304bae3"
+    },
+    {
+      "id": "icon-weed",
+      "file": "icon-weed.png",
+      "category": "icon",
+      "width": 16,
+      "height": 16,
+      "opaque_colors": 5,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "8102e658f8e7a144f44f65b9b8dbbbe21ce2281b80b8350c2c8ee25e5bde294c"
+    },
+    {
+      "id": "icon-pest",
+      "file": "icon-pest.png",
+      "category": "icon",
+      "width": 16,
+      "height": 16,
+      "opaque_colors": 3,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "f5063a0cea4f5a9f033a6b17af050f5fa44963c7320b553edcf02c23e090375a"
+    },
+    {
+      "id": "icon-moon",
+      "file": "icon-moon.png",
+      "category": "icon",
+      "width": 16,
+      "height": 16,
+      "opaque_colors": 1,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "45dce3ff9c9943e92ca5532e0543fb7d428d1c1e44b3654174e3ab64ab48145b"
+    },
+    {
+      "id": "icon-ready",
+      "file": "icon-ready.png",
+      "category": "icon",
+      "width": 16,
+      "height": 16,
+      "opaque_colors": 1,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "3c8cd5e9b4a3f4c8e79f9a841e0016447e3e9af192d0cc0e3d0d4c2d11a45533"
+    },
+    {
+      "id": "icon-dry",
+      "file": "icon-dry.png",
+      "category": "icon",
+      "width": 16,
+      "height": 16,
+      "opaque_colors": 1,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "3ce6e736860d3f48ede98f0c26fe4b4b73fbb74e6a9b7a8dcce182ee8c258892"
+    },
+    {
+      "id": "watering-frame-0",
+      "file": "watering-frame-0.png",
+      "category": "effect",
+      "width": 16,
+      "height": 16,
+      "opaque_colors": 2,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "3bb27d2b6187726701059fd4fb29ce785af2c10639eead58973bc3d21e34de9a",
+      "duration_ms": 150
+    },
+    {
+      "id": "watering-frame-1",
+      "file": "watering-frame-1.png",
+      "category": "effect",
+      "width": 16,
+      "height": 16,
+      "opaque_colors": 2,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "bfc75dbd05a518c8961b7aaafcaa3db1728a982f80eca28bce20654f312e0dd8",
+      "duration_ms": 150
+    },
+    {
+      "id": "watering-frame-2",
+      "file": "watering-frame-2.png",
+      "category": "effect",
+      "width": 16,
+      "height": 16,
+      "opaque_colors": 2,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "985582fbd7c9faefef5248dc979533ebc36ff6a39f323d7a7d9e57842abdf998",
+      "duration_ms": 150
+    },
+    {
+      "id": "watering-frame-3",
+      "file": "watering-frame-3.png",
+      "category": "effect",
+      "width": 16,
+      "height": 16,
+      "opaque_colors": 1,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "dfb7646615504716d4c106dd12d4d68520fcd07c04e71a45f0baf493d57d0233",
+      "duration_ms": 150
+    },
+    {
+      "id": "sparkle-frame-0",
+      "file": "sparkle-frame-0.png",
+      "category": "effect",
+      "width": 16,
+      "height": 16,
+      "opaque_colors": 1,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "ac7042cd9e91e505aed4edd30060cde97d91474e610a9d582196de058d19e779",
+      "duration_ms": 150
+    },
+    {
+      "id": "sparkle-frame-1",
+      "file": "sparkle-frame-1.png",
+      "category": "effect",
+      "width": 16,
+      "height": 16,
+      "opaque_colors": 2,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "42788becd366db6f51082f3c3fc84f283c023c7c3eb24524d815c3e5ce9fd888",
+      "duration_ms": 150
+    },
+    {
+      "id": "sparkle-frame-2",
+      "file": "sparkle-frame-2.png",
+      "category": "effect",
+      "width": 16,
+      "height": 16,
+      "opaque_colors": 1,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "980fd9884d82c4173a39afd67363ed98a49ac07d9240774b656262197a9abd10",
+      "duration_ms": 150
+    },
+    {
+      "id": "plants-four-stages-atlas",
+      "file": "plants-four-stages-atlas.png",
+      "category": "atlas",
+      "width": 192,
+      "height": 288,
+      "opaque_colors": 20,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "4af1a49c48b6702d04178f25bc004848073a9ac86d294aae7a1902340067bfdf",
+      "cell_size": [
+        48,
+        48
+      ],
+      "grid": [
+        4,
+        6
+      ]
+    }
+  ],
+  "animation": {
+    "watering": {
+      "frames": 4,
+      "duration_ms": [
+        150,
+        150,
+        150,
+        150
+      ],
+      "loop": false
+    },
+    "mature_sparkle": {
+      "frames": 3,
+      "duration_ms": [
+        150,
+        150,
+        150
+      ],
+      "loop": false
+    }
+  },
+  "audit": {
+    "native_asset_count": 70,
+    "stage_count": 24,
+    "dry_count": 18,
+    "deficient_count": 12,
+    "icon_count": 9,
+    "effect_count": 7,
+    "palette_opaque_count": 24,
+    "binary_alpha": true,
+    "shared_palette_valid": true,
+    "native_png_bytes": 36502,
+    "static_rgb565_plus_1bit_mask_bytes": 117504,
+    "current_sprite_rgb565_plus_1bit_mask_bytes": 4896,
+    "display_96x96_rgb565_bytes": 18432,
+    "generation": {
+      "tool": "GenerateImage",
+      "source": "plant-style-concept.jpg",
+      "role": "concept direction"
+    },
+    "reconstruction": "Native 48x48 grid; manually specified silhouette and leaf clusters; no resampling from generated concept.",
+    "unverified": [
+      "child blind recognition",
+      "physical LCD colors",
+      "firmware font rendering",
+      "on-device memory and decode timing"
+    ]
+  }
+}

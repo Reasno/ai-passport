@@ -1,5 +1,6 @@
 #include "ui_games.h"
 #include "find_service.h"
+#include "ui_garden.h"
 #include "ptt_service.h"
 #include "ui_common.h"
 #include "ui_pixel_icons.h"
@@ -108,7 +109,8 @@ static void game_card(lv_obj_t *screen, int y, bool selected, bool enabled, ui_p
     if (art) {
         image = lv_image_create(card);
         lv_image_set_src(image, art);
-        lv_image_set_scale(image, 128);
+        /* Game art is scaled to the 40 px of the other menu icons. */
+        lv_image_set_scale(image, art->header.w == RPS_ART_WIDTH ? 128 : 256 * 40 / art->header.w);
         lv_image_set_antialias(image, false);
     } else {
         image = icon == UI_PIXEL_ICON_RADAR
@@ -121,8 +123,8 @@ static void game_card(lv_obj_t *screen, int y, bool selected, bool enabled, ui_p
     }
     if (image) {
         /* Scaled artwork keeps its original object bounds in LVGL. Offset the
-         * 54 px mole canvas so its visual centre matches the 40 px menu icons. */
-        const int icon_x = art ? 14 - (RPS_ART_WIDTH - 40) / 2 : 14;
+         * canvas so its visual centre matches the 40 px menu icons. */
+        const int icon_x = art ? 34 - (int)art->header.w / 2 : 14;
         lv_obj_align(image, LV_ALIGN_LEFT_MID, icon_x, 0);
     }
     ui_common_label(card, title, 56, 2, 148, LV_TEXT_ALIGN_LEFT, false);
@@ -156,9 +158,12 @@ lv_obj_t *ui_games_build(const app_model_snapshot_t *model, const game_snapshot_
         else if (i == 3)
             game_card(screen, y, selected == 3, versus, UI_PIXEL_ICON_RPS, &s_mole_logo, "打地鼠",
                       game->paired ? "合作瞄准并换弹" : "请先完成配对");
-        else
+        else if (i == 4)
             game_card(screen, y, selected == 4, versus, UI_PIXEL_ICON_RACE, NULL, "极速赛车",
                       game->paired ? "抢氮气 落后可开DRS" : "请先完成配对");
+        else
+            game_card(screen, y, selected == 5, true, UI_PIXEL_ICON_RPS, ui_garden_menu_icon(),
+                      "口袋花园", "照顾我的植物");
     }
     char heap[48];
     snprintf(heap, sizeof(heap), "第%d/%d个  可用内存 %lu KB", selected + 1, UI_GAMES_COUNT,
